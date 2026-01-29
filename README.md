@@ -1,6 +1,13 @@
-# Snow Bin Skills
+# Snow Utils Skills
 
 CoCo skills for Snowflake automation tasks.
+
+## Overview
+
+These skills were built using the [snow-bin-utils](https://github.com/kameshsampath/snow-bin-utils) project. They follow the Claude Skills style but are called **CoCo skills** for use with CoCo/Cortex Code.
+
+> [!IMPORTANT]
+> Currently, the skills only support external volumes with AWS (S3).
 
 ## Skills
 
@@ -11,40 +18,39 @@ CoCo skills for Snowflake automation tasks.
 
 ## Installation
 
-Clone into your project's `.claude/skills/` directory:
+Add skills using the CoCo or Cortex CLI:
 
 ```bash
-# From your project root
-git clone git@github.com:kameshsampath/snow-utils-skills.git .claude/skills
-```
+# Using coco
+coco skill add https://github.com/kameshsampath/snow-utils-skills
 
-Or clone to a central location and symlink:
-
-```bash
-# Clone once
-git clone git@github.com:kameshsampath/snow-utils-skills.git ~/snow-utils-skills
-
-# Symlink into each project
-mkdir -p .claude/skills
-ln -s ~/snow-utils-skills/iceberg-external-volume .claude/skills/
-ln -s ~/snow-utils-skills/snowflake-pat .claude/skills/
+# Or using cortex
+cortex skill add https://github.com/kameshsampath/snow-utils-skills
 ```
 
 ## Usage
 
-In Cortex Code, trigger the skills with phrases like:
+Trigger the skills with phrases like:
+
 - "setup iceberg storage" or "create external volume"
 - "create PAT" or "setup service account"
 
 ## Updating
 
-Pull latest changes:
+To update to the latest version:
 
 ```bash
-cd .claude/skills  # or ~/snow-utils-skills if using symlinks
-git pull origin main
+# Using coco
+coco skill update snow-utils-skills
+
+# Or using cortex
+cortex skill update snow-utils-skills
 ```
 
-## Source
+## License
 
-These skills wrap the CLI tools from [snow-bin-utils](https://github.com/kameshsampath/snow-bin-utils).
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## Citation
+
+If you use this software, please cite it using the information in [CITATION.cff](CITATION.cff).
