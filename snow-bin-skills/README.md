@@ -15,19 +15,19 @@ Clone into your project's `.claude/skills/` directory:
 
 ```bash
 # From your project root
-git clone git@github.com:kameshsampath/snow-utils-skills.git .claude/skills
+git clone git@github.com:kameshsampath/snow-bin-skills.git .claude/skills
 ```
 
 Or clone to a central location and symlink:
 
 ```bash
 # Clone once
-git clone git@github.com:kameshsampath/snow-utils-skills.git ~/snow-utils-skills
+git clone git@github.com:kameshsampath/snow-bin-skills.git ~/snow-bin-skills
 
 # Symlink into each project
 mkdir -p .claude/skills
-ln -s ~/snow-utils-skills/iceberg-external-volume .claude/skills/
-ln -s ~/snow-utils-skills/snowflake-pat .claude/skills/
+ln -s ~/snow-bin-skills/iceberg-external-volume .claude/skills/
+ln -s ~/snow-bin-skills/snowflake-pat .claude/skills/
 ```
 
 ## Usage
@@ -41,7 +41,7 @@ In Cortex Code, trigger the skills with phrases like:
 Pull latest changes:
 
 ```bash
-cd .claude/skills  # or ~/snow-utils-skills if using symlinks
+cd .claude/skills  # or ~/snow-bin-skills if using symlinks
 git pull origin main
 ```
 
