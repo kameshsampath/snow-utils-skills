@@ -481,25 +481,26 @@ def delete_iam_role(iam_client: Any, role_name: str, policy_arn: str) -> None:
 # =============================================================================
 
 
+def get_external_volume_sql(config: ExternalVolumeConfig, role_arn: str) -> str:
+    """Generate SQL for creating external volume."""
+    allow_writes = "TRUE" if config.allow_writes else "FALSE"
+    return f"""CREATE OR REPLACE EXTERNAL VOLUME {config.volume_name}
+    STORAGE_LOCATIONS = (
+        (
+            NAME = '{config.storage_location_name}'
+            STORAGE_PROVIDER = 'S3'
+            STORAGE_BASE_URL = 's3://{config.bucket_name}/'
+            STORAGE_AWS_ROLE_ARN = '{role_arn}'
+            STORAGE_AWS_EXTERNAL_ID = '{config.external_id}'
+        )
+    )
+    ALLOW_WRITES = {allow_writes};"""
+
+
 def create_external_volume(config: ExternalVolumeConfig, role_arn: str) -> None:
     """Create Snowflake external volume."""
     click.echo(f"Creating Snowflake external volume: {config.volume_name}")
-
-    allow_writes = "TRUE" if config.allow_writes else "FALSE"
-
-    sql = f"""
-        CREATE OR REPLACE EXTERNAL VOLUME {config.volume_name}
-            STORAGE_LOCATIONS = (
-                (
-                    NAME = '{config.storage_location_name}'
-                    STORAGE_PROVIDER = 'S3'
-                    STORAGE_BASE_URL = 's3://{config.bucket_name}/'
-                    STORAGE_AWS_ROLE_ARN = '{role_arn}'
-                    STORAGE_AWS_EXTERNAL_ID = '{config.external_id}'
-                )
-            )
-            ALLOW_WRITES = {allow_writes};
-    """
+    sql = get_external_volume_sql(config, role_arn)
     run_snow_sql_stdin(sql)
     click.echo(f"✓ Created external volume: {config.volume_name}")
 
@@ -865,10 +866,69 @@ def create(
         click.echo()
 
     if dry_run:
-        click.echo("─" * 40)
-        click.echo("Dry run complete. No resources were created.")
-        click.echo("─" * 40)
+        # For dry-run, try to get account_id but use placeholder if AWS creds unavailable
+        try:
+            sts_client = boto3.client("sts")
+            account_id = get_aws_account_id(sts_client)
+        except Exception:
+            account_id = "<AWS_ACCOUNT_ID>"
+            click.echo("⚠ AWS credentials not available - using placeholders")
+            click.echo()
+        role_arn = f"arn:aws:iam::{account_id}:role/{config.role_name}"
+
+        click.echo("─" * 60)
+        click.echo("Step 1: Create S3 bucket with versioning")
+        click.echo("─" * 60)
+        click.echo(f"Bucket: {config.bucket_name}")
+        click.echo(f"Region: {region}")
+        click.echo("Versioning: Enabled")
         click.echo()
+
+        click.echo("─" * 60)
+        click.echo("Step 2: Create IAM Policy")
+        click.echo("─" * 60)
+        click.echo(f"Policy Name: {config.policy_name}")
+        click.echo(f"Policy ARN:  arn:aws:iam::{account_id}:policy/{config.policy_name}")
+        click.echo()
+        click.echo("Policy Document:")
+        policy_doc = get_s3_access_policy(config.bucket_name)
+        click.echo(json.dumps(policy_doc, indent=2))
+        click.echo()
+
+        click.echo("─" * 60)
+        click.echo("Step 3: Create IAM Role with Trust Policy")
+        click.echo("─" * 60)
+        click.echo(f"Role Name: {config.role_name}")
+        click.echo(f"Role ARN:  {role_arn}")
+        click.echo()
+        click.echo("Initial Trust Policy (before Snowflake IAM user is known):")
+        initial_trust = get_initial_trust_policy(account_id, config.external_id)
+        click.echo(json.dumps(initial_trust, indent=2))
+        click.echo()
+        click.echo("Final Trust Policy (after external volume creation):")
+        final_trust = get_snowflake_trust_policy("<SNOWFLAKE_IAM_USER_ARN>", config.external_id)
+        click.echo(json.dumps(final_trust, indent=2))
+        click.echo()
+
+        click.echo("─" * 60)
+        click.echo("Step 4: Create Snowflake External Volume")
+        click.echo("─" * 60)
+        click.echo()
+        click.echo(get_external_volume_sql(config, role_arn))
+        click.echo()
+
+        click.echo("─" * 60)
+        click.echo("Step 5-7: Post-creation steps")
+        click.echo("─" * 60)
+        click.echo(f"-- Retrieve Snowflake IAM user ARN")
+        click.echo(f"DESC EXTERNAL VOLUME {config.volume_name};")
+        click.echo()
+        click.echo("-- Update IAM trust policy with actual Snowflake IAM user ARN")
+        click.echo("-- Verify external volume")
+        click.echo(f"SELECT SYSTEM$VERIFY_EXTERNAL_VOLUME('{config.volume_name}');")
+        click.echo()
+        click.echo("─" * 60)
+        click.echo("Dry run complete. No resources were created.")
         click.echo("To create these resources, run without --dry-run")
         return
 

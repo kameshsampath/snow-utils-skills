@@ -18,27 +18,23 @@ Creates service users, network policies, authentication policies, and Programmat
    ls -la .env 2>/dev/null || echo "missing"
    ```
 
-2. **If .env missing**, create template:
+2. **If .env missing**, copy from `.env.example`:
    ```bash
-   cat > .env << 'EOF'
-   # Snowflake connection
-   SNOWFLAKE_DEFAULT_CONNECTION_NAME=
-
-   # Service account settings
-   SA_USER=
-   SA_ROLE=
-   SA_ADMIN_ROLE=
-   PAT_OBJECTS_DB=
-
-   # Optional: specify local IP (auto-detected if empty)
-   LOCAL_IP=
-   EOF
+   cp <SKILL_DIR>/.env.example .env
    ```
+   
+   **If .env exists**, MERGE new settings - do NOT overwrite:
+   - Read existing .env
+   - Add only missing keys from `.env.example`
+   - Preserve user's existing values
 
 3. **Verify** Snowflake connection:
    ```bash
-   snow connection test
+   snow connection list
    ```
+   If user needs to choose a connection, ask them and then:
+   - Set `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<chosen_connection>` in .env
+   - Use this connection for all subsequent `snow` CLI commands
 
 4. **Check** required privileges:
    - CREATE USER (or use existing user)
@@ -61,6 +57,16 @@ To create the PAT:
 
 **⚠️ STOP**: Wait for user input.
 
+**After user provides input, update `.env` with their values:**
+
+Update these variables in `.env`:
+- `SA_USER=<user_service_user_name>`
+- `SA_ROLE=<user_pat_role>`
+- `SA_ADMIN_ROLE=<user_admin_role>`
+- `PAT_OBJECTS_DB=<user_database>`
+
+This ensures values are saved for future runs (e.g., rotate, remove commands).
+
 ### Step 3: Preview (Dry Run)
 
 **Execute:**
@@ -69,11 +75,36 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   create --user <USER> --role <ROLE> --db <DB> --dry-run
 ```
 
-**Present** the planned resources to user:
-- Service user configuration
-- Network rule and policy
-- Authentication policy
-- PAT name
+**CRITICAL: You MUST show ALL SQL from the dry-run output. Do NOT skip or summarize.**
+
+**Section 1: Resources Summary**
+List what would be created with actual names from output.
+
+**Section 2: ALL SQL Statements (REQUIRED - DO NOT SKIP)**
+Copy the COMPLETE SQL from output under "SQL that would be executed:" and display as:
+
+```sql
+-- Step 1: Create service user
+USE ROLE accountadmin;
+CREATE USER IF NOT EXISTS ...
+... (copy ALL SQL from output)
+
+-- Step 2: Create network rule and policy
+USE ROLE ...;
+CREATE DATABASE IF NOT EXISTS ...;
+CREATE OR REPLACE NETWORK RULE ...;
+CREATE OR REPLACE NETWORK POLICY ...;
+... (copy ALL SQL)
+
+-- Step 3: Create authentication policy
+CREATE OR ALTER AUTHENTICATION POLICY ...;
+... (copy ALL SQL)
+
+-- Step 4: Create PAT
+ALTER USER IF EXISTS ... ADD PAT ...;
+```
+
+**FAILURE TO SHOW COMPLETE SQL IS A SKILL VIOLATION.** Users cannot approve without reviewing all statements.
 
 **⚠️ STOP**: Get approval before creating resources.
 
