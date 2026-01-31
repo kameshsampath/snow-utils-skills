@@ -28,13 +28,17 @@ Creates and manages network rules and policies for IP-based access control in Sn
    - Add only missing keys from `.env.example`
    - Preserve user's existing values
 
-3. **Verify** Snowflake connection:
+3. **Verify** Snowflake connection and get defaults:
    ```bash
    snow connection list
    ```
-   If user needs to choose a connection, ask them and then:
-   - Set `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<chosen_connection>` in .env
-   - Use this connection for all subsequent `snow` CLI commands
+   - If user needs to choose a connection, ask them to select one
+   - Test the selected connection to get effective defaults:
+   ```bash
+   snow connection test -c <selected_connection> --format json
+   ```
+   - Extract defaults from test output: Role, Database, Warehouse
+   - Set `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<selected_connection>` in .env
 
 4. **Check** required privileges:
    - CREATE DATABASE (or use existing)
@@ -45,20 +49,26 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 ### Step 2: Gather Requirements
 
+**Use connection test results as prompt defaults** (from Step 1):
+- Database: use test output's Database (if not "not set")
+- Role: use test output's Role
+- Schema: default to NETWORKS
+
 **Ask user:**
 ```
 To create the network rule:
 1. Rule name:
-2. Database for network objects:
+2. Database for network objects (default: <connection_database>):
 3. Schema (default: NETWORKS):
-4. Rule type: INGRESS (inbound) or EGRESS (outbound)?
-5. IP sources to include:
-   - Local IP (auto-detected)
+4. IP sources to include:
+   - Local IP (auto-detected, default: ON)
    - GitHub Actions IPs
    - Google IPs
    - Custom CIDRs
-6. Create network policy? (name if yes)
+5. Create network policy? (name if yes)
 ```
+
+**Note:** Mode defaults to INGRESS. Only ask about mode if user mentions egress/outbound.
 
 **⚠️ STOP**: Wait for user input.
 
@@ -74,8 +84,8 @@ Update these variables in `.env`:
 **Execute:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
-  rule --name <NAME> --db <DB> --mode <ingress|egress> \
-  [--with-local] [--with-gh] [--with-google] [--values <CIDRs>] \
+  rule create --name <NAME> --db <DB> \
+  [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
   [--policy <POLICY_NAME>] --dry-run
 ```
 
@@ -115,8 +125,8 @@ CREATE IF NOT EXISTS NETWORK POLICY ...
 **Execute:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
-  rule --name <NAME> --db <DB> --mode <ingress|egress> \
-  [--with-local] [--with-gh] [--with-google] [--values <CIDRs>] \
+  rule create --name <NAME> --db <DB> \
+  [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
   [--policy <POLICY_NAME>]
 ```
 
@@ -128,7 +138,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
 
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
-  list-rules --db <DB>
+  rule list --db <DB>
 ```
 
 ## Tools
@@ -137,18 +147,16 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
 
 **Description**: Creates and manages Snowflake network rules and policies.
 
-**Commands:**
-- `rule`: Create a network rule with optional policy
-- `policy`: Create a standalone network policy
-- `list-rules`: List network rules in a database
-- `list-policies`: List network policies
+**Command Groups:**
+- `rule` - Manage network rules (create, list, delete)
+- `policy` - Manage network policies (create, alter, list, delete)
 
-**Rule Usage:**
+**Rule Create Usage:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
-  rule --name NAME --db DATABASE \
+  rule create --name NAME --db DATABASE \
   [--schema SCHEMA] [--mode ingress|egress] [--type ipv4|host_port|awsvpceid] \
-  [--values CIDRs] [--with-local] [--with-gh] [--with-google] \
+  [--values CIDRs] [--allow-local] [--allow-gh] [--allow-google] \
   [--policy POLICY_NAME] [--force] [--dry-run]
 ```
 
@@ -159,17 +167,25 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
 - `--mode, -m`: INGRESS or EGRESS (default: INGRESS)
 - `--type, -t`: IPV4, HOST_PORT, or AWSVPCEID (default: IPV4)
 - `--values`: Comma-separated CIDRs or values
-- `--with-local`: Include auto-detected local IP
-- `--with-gh, -G`: Include GitHub Actions IPs
-- `--with-google, -g`: Include Google IPs
+- `--allow-local`: Include auto-detected local IP (default: ON)
+- `--allow-gh, -G`: Include GitHub Actions IPs
+- `--allow-google, -g`: Include Google IPs
 - `--policy, -p`: Also create network policy with this name
 - `--force, -f`: Use CREATE OR REPLACE instead of CREATE IF NOT EXISTS
 - `--dry-run`: Preview SQL without executing
 
-**Policy Usage:**
+**Rule List/Delete:**
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
-  policy --name NAME --rules RULE1,RULE2 [--force] [--dry-run]
+network.py rule list --db DATABASE [--schema SCHEMA]
+network.py rule delete --name NAME --db DATABASE [--schema SCHEMA]
+```
+
+**Policy Create/Alter/Delete:**
+```bash
+network.py policy create --name NAME --rules "db.schema.rule1,db.schema.rule2"
+network.py policy alter --name NAME --rules "db.schema.rule3"
+network.py policy delete --name NAME [--user USER_TO_UNSET]
+network.py policy list
 ```
 
 ## Stopping Points

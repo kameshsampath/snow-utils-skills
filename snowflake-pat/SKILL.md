@@ -28,13 +28,17 @@ Creates service users, network policies, authentication policies, and Programmat
    - Add only missing keys from `.env.example`
    - Preserve user's existing values
 
-3. **Verify** Snowflake connection:
+3. **Verify** Snowflake connection and get defaults:
    ```bash
    snow connection list
    ```
-   If user needs to choose a connection, ask them and then:
-   - Set `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<chosen_connection>` in .env
-   - Use this connection for all subsequent `snow` CLI commands
+   - If user needs to choose a connection, ask them to select one
+   - Test the selected connection to get effective defaults:
+   ```bash
+   snow connection test -c <selected_connection> --format json
+   ```
+   - Extract defaults from test output: Role, Database, Warehouse
+   - Set `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<selected_connection>` in .env
 
 4. **Check** required privileges:
    - CREATE USER (or use existing user)
@@ -45,13 +49,17 @@ Creates service users, network policies, authentication policies, and Programmat
 
 ### Step 2: Gather Requirements
 
+**Use connection test results as prompt defaults** (from Step 1):
+- Database: use test output's Database (if not "not set")
+- Role: use test output's Role
+
 **Ask user:**
 ```
 To create the PAT:
 1. Service user name:
-2. PAT role (role restriction for the token):
-3. Admin role (for creating policies, default: same as PAT role):
-4. Database for policy objects:
+2. PAT role (default: <connection_role>):
+3. Admin role (default: same as PAT role):
+4. Database for policy objects (default: <connection_database>):
 5. PAT expiry days (default: 30):
 ```
 
