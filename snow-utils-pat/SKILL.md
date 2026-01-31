@@ -1,5 +1,5 @@
 ---
-name: snowflake-pat
+name: snow-utils-pat
 description: "Create Snowflake Programmatic Access Tokens (PATs) for service accounts. Use when: setting up service user, creating PAT, configuring authentication policy, network policy for PAT. Triggers: programmatic access token, PAT, service account, snowflake authentication."
 ---
 

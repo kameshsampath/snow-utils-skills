@@ -1,5 +1,5 @@
 ---
-name: iceberg-external-volume
+name: snow-utils-volumes
 description: "Create Snowflake external volumes for Iceberg tables with S3 storage. Use when: setting up Iceberg storage, creating external volume, configuring S3 for Snowflake. Triggers: iceberg storage, external volume, s3 snowflake, setup iceberg."
 ---
 
