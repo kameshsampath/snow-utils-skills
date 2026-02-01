@@ -1,0 +1,45 @@
+version: "3"
+
+vars:
+  CORTEX_CONFIG: '{{.HOME}}/.config/.snowflake/cortex'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  skills:register:
+    desc: Register skills with CoCo (only if not already registered)
+    cmds:
+      - |
+        if cortex skill list 2>/dev/null | grep -q "{{.PWD}}$"; then
+          echo "✓ Skills already registered from {{.PWD}}"
+        else
+          echo "Registering skills from {{.PWD}}..."
+          cortex skill add "{{.PWD}}"
+          echo "✓ Skills registered"
+        fi
+
+  skills:reload:
+    desc: Clear CoCo cache to reload skills
+    deps:
+      - skills:register
+    cmds:
+      - echo "Clearing CoCo cache..."
+      - rm -rf "{{.CORTEX_CONFIG}}/cache" 2>/dev/null || true
+      - echo "✓ Cache cleared"
+      - echo ""
+      - echo "⚠ Restart CoCo or start a new chat session for changes to take effect"
+
+  skills:list:
+    desc: List installed skills
+    cmds:
+      - cortex skill list
+
+  skills:clean:
+    desc: Remove snow-utils skills from CoCo
+    cmds:
+      - echo "Removing snow-utils skills..."
+      - cortex skill remove "{{.PWD}}" 2>/dev/null || true
+      - echo "✓ Skills removed"

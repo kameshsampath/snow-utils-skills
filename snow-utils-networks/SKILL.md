@@ -9,6 +9,12 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 ## Workflow
 
+**🚫 FORBIDDEN ACTIONS - NEVER DO THESE:**
+- NEVER run SQL queries to discover/find/check SA_ROLE, SNOW_UTILS_DB, or any infrastructure
+- NEVER run `SHOW ROLES`, `SHOW DATABASES`, or similar to populate empty .env values
+- NEVER auto-populate empty values by querying Snowflake
+- If .env values are empty, they stay empty until the user provides them via interactive prompt
+
 ### Step 1: Check Environment
 
 **Actions:**
@@ -18,7 +24,7 @@ Creates and manages network rules and policies for IP-based access control in Sn
    ls -la .env 2>/dev/null || echo "missing"
    ```
 
-2. **If .env missing**, copy from `.env.example`:
+2. **If .env missing**, copy EXACTLY from `.env.example`:
    ```bash
    cp <SKILL_DIR>/.env.example .env
    ```
@@ -28,56 +34,56 @@ Creates and manages network rules and policies for IP-based access control in Sn
    - Add only missing keys from `.env.example`
    - Preserve user's existing values
 
-3. **Verify** Snowflake connection and get defaults:
+3. **Verify** Snowflake connection:
    ```bash
    snow connection list
    ```
    - If user needs to choose a connection, ask them to select one
-   - Test the selected connection to get effective defaults:
-   ```bash
-   snow connection test -c <selected_connection> --format json
-   ```
-   - Extract defaults from test output: Role, Database, Warehouse
-   - Set `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<selected_connection>` in .env
+   - Set ONLY `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<selected_connection>` in .env
+
+**⚠️ CRITICAL RULES FOR STEP 1:**
+- Do NOT run any SQL queries (no SHOW ROLES, SHOW DATABASES, etc.)
+- Do NOT try to discover or infer SA_ROLE or SNOW_UTILS_DB values
+- Do NOT set these values - leave them empty in .env
+- The ONLY value to set is SNOWFLAKE_DEFAULT_CONNECTION_NAME
+- Proceed to Step 2 - the script will prompt user for values
+
+**⚠️ STOP**: After setting connection, proceed DIRECTLY to Step 2. Do not run any additional commands.
 
 ### Step 2: Check Infrastructure (REQUIRED)
 
-**Run pre-flight check with user's connection:**
+**Run pre-flight check with NO FLAGS** (script will prompt interactively):
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
-  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-  --role "${SA_ROLE:-SA_ROLE}" --db "${SNOW_UTILS_DB:-SNOW_UTILS}" --quiet
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
 ```
 
-**If exit code is non-zero (infrastructure missing):**
+**⚠️ CRITICAL: Run the command EXACTLY as shown above.**
+- Do NOT add any flags
+- Do NOT source .env before running
+- Let the script prompt the user interactively
 
-1. **Ask user**: "The snow-utils infrastructure (SA_ROLE and SNOW_UTILS_DB) is not set up. Would you like to create it now? This requires ACCOUNTADMIN role."
+The script will:
+1. Prompt for SA Role name (default: SNOW_UTILS_SA)
+2. Prompt for Database name (default: SNOW_UTILS)
+3. Check if infrastructure exists
+4. Offer to create it if missing (requires ACCOUNTADMIN)
 
-2. **If user agrees**, run setup:
-   ```bash
-   uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
-     -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-     --role "${SA_ROLE:-SA_ROLE}" --db "${SNOW_UTILS_DB:-SNOW_UTILS}" --auto-setup
-   ```
+**After setup completes, update `.env`** with the values user provided:
+- `SA_ROLE=<user_role>`
+- `SNOW_UTILS_DB=<user_db>`
 
-3. **If user declines**, explain they need to run setup first:
-   - `snow sql -f snow-utils-setup.sql --templating=all --role ACCOUNTADMIN`
-   - Or use the snow-bin-utils project: `task snow-utils:setup`
+**If user declines setup**, explain they need to run setup first:
+- `snow sql -f snow-utils-setup.sql --templating all --role ACCOUNTADMIN`
 
 **If exit code is 0**: Continue to Step 3.
 
 ### Step 3: Gather Requirements
 
-**Use connection test results as prompt defaults** (from Step 1):
-- Database: use SNOW_UTILS_DB from .env (default: SNOW_UTILS)
-- Role: use SA_ROLE from .env (default: SA_ROLE)
-- Schema: default to NETWORKS
-
 **Ask user:**
 ```
 To create the network rule:
 1. Rule name:
-2. Database for network objects (default: SNOW_UTILS):
+2. Database for network objects (default: ${SNOW_UTILS_DB}):
 3. Schema (default: NETWORKS):
 4. IP sources to include:
    - Local IP (auto-detected, default: ON)
@@ -103,6 +109,7 @@ Update these variables in `.env`:
 **Execute:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
   rule create --name <NAME> --db <DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
   [--policy <POLICY_NAME>] --dry-run
@@ -144,6 +151,7 @@ CREATE IF NOT EXISTS NETWORK POLICY ...
 **Execute:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
   rule create --name <NAME> --db <DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
   [--policy <POLICY_NAME>]
@@ -157,6 +165,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
 
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
   rule list --db <DB>
 ```
 
@@ -164,19 +173,19 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
 
 ### check_setup.py
 
-**Description**: Pre-flight check for snow-utils infrastructure.
+**Description**: Pre-flight check for snow-utils infrastructure. Prompts interactively for values.
 
 **Usage:**
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
-  [--role SA_ROLE] [--db SNOW_UTILS] [--auto-setup] [--quiet]
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
 ```
 
+**⚠️ DO NOT ADD ANY FLAGS. The script will prompt interactively.**
+
 **Options:**
-- `--role`, `-r`: SA role name (default: SA_ROLE, env: SA_ROLE)
-- `--db`, `-d`: Database name (default: SNOW_UTILS, env: SNOW_UTILS_DB)
-- `--auto-setup`: Automatically run setup if needed (no prompt)
-- `--quiet`, `-q`: Exit 0 if ready, 1 if not (no output)
+- `--quiet`, `-q`: Exit 0 if ready, 1 if not (no output, for scripting only)
+
+Uses the active Snowflake connection from SNOWFLAKE_DEFAULT_CONNECTION_NAME.
 
 **Exit codes:**
 - 0: Infrastructure ready
@@ -187,6 +196,11 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
 
 **Description**: Creates and manages Snowflake network rules and policies.
 
+**Global Options:**
+- `--connection`, `-c`: Snowflake connection name [env: SNOWFLAKE_DEFAULT_CONNECTION_NAME]
+- `--verbose`, `-v`: Enable verbose output
+- `--debug`, `-d`: Enable debug output
+
 **Command Groups:**
 - `rule` - Manage network rules (create, list, delete)
 - `policy` - Manage network policies (create, alter, list, delete)
@@ -194,7 +208,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
 **Rule Create Usage:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
-  rule create --name NAME --db DATABASE \
+  [-c CONNECTION] rule create --name NAME --db DATABASE \
   [--schema SCHEMA] [--mode ingress|egress] [--type ipv4|host_port|awsvpceid] \
   [--values CIDRs] [--allow-local] [--allow-gh] [--allow-google] \
   [--policy POLICY_NAME] [--force] [--dry-run]
@@ -231,7 +245,7 @@ network.py policy list
 ## Stopping Points
 
 - ✋ Step 1: If environment checks fail
-- ✋ Step 2: If infrastructure missing (ask user to set up)
+- ✋ Step 2: Interactive prompts for SA_ROLE/SNOW_UTILS_DB, then setup if needed
 - ✋ Step 3: After gathering requirements  
 - ✋ Step 4: After dry-run preview (get approval)
 - ✋ Step 5: If creation fails
@@ -244,9 +258,9 @@ network.py policy list
 
 ## Troubleshooting
 
-**Infrastructure not set up**: Run `check_setup.py --auto-setup` or manually run setup with ACCOUNTADMIN.
+**Infrastructure not set up**: Run `check_setup.py` interactively or with `--auto-setup`.
 
-**Permission denied**: SA_ROLE needs CREATE NETWORK RULE and CREATE NETWORK POLICY privileges. Run `task snow-utils:setup` to create role with proper grants.
+**Permission denied**: SA_ROLE needs CREATE NETWORK RULE and CREATE NETWORK POLICY privileges.
 
 **Rule already exists**: Use `--force` to replace existing rule.
 

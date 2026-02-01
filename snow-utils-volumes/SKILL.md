@@ -9,6 +9,12 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Ice
 
 ## Workflow
 
+**🚫 FORBIDDEN ACTIONS - NEVER DO THESE:**
+- NEVER run SQL queries to discover/find/check SA_ROLE, SNOW_UTILS_DB, or EXTERNAL_VOLUME_NAME
+- NEVER run `SHOW ROLES`, `SHOW DATABASES`, `SHOW EXTERNAL VOLUMES` to populate empty .env values
+- NEVER auto-populate empty values by querying Snowflake
+- If .env values are empty, they stay empty until the user provides them via interactive prompt
+
 ### Step 1: Check Environment
 
 **Actions:**
@@ -18,7 +24,7 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Ice
    ls -la .env 2>/dev/null || echo "missing"
    ```
 
-2. **If .env missing**, copy from `.env.example`:
+2. **If .env missing**, copy EXACTLY from `.env.example`:
    ```bash
    cp <SKILL_DIR>/.env.example .env
    ```
@@ -39,8 +45,16 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Ice
    snow connection list
    ```
    If user needs to choose a connection, ask them and then:
-   - Set `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<chosen_connection>` in .env
-   - Use this connection for all subsequent `snow` CLI commands
+   - Set ONLY `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<chosen_connection>` in .env
+
+**⚠️ CRITICAL RULES FOR STEP 1:**
+- Do NOT run any SQL queries (no SHOW ROLES, SHOW DATABASES, SHOW EXTERNAL VOLUMES)
+- Do NOT try to discover or infer SA_ROLE, SNOW_UTILS_DB, or EXTERNAL_VOLUME_NAME
+- Do NOT set these values - leave them empty in .env
+- The ONLY value to set is SNOWFLAKE_DEFAULT_CONNECTION_NAME
+- Proceed to Step 2 - the script will prompt user for values
+
+**⚠️ STOP**: After setting connection, proceed DIRECTLY to Step 2. Do not run any additional commands.
 
 **If any check fails**: Stop and help user resolve.
 
@@ -48,29 +62,50 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Ice
 
 External volumes are account-level objects that require CREATE EXTERNAL VOLUME privilege. The SA_ROLE created by snow-utils:setup has this privilege.
 
-**Run pre-flight check with user's connection:**
+**Run pre-flight check with NO FLAGS** (script will prompt interactively):
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
-  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-  --role "${SA_ROLE:-SA_ROLE}" --db "${SNOW_UTILS_DB:-SNOW_UTILS}" --quiet
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
 ```
 
-**If exit code is non-zero (infrastructure missing):**
+**⚠️ CRITICAL: Run the command EXACTLY as shown above.**
+- Do NOT add any flags
+- Do NOT source .env before running
+- Let the script prompt the user interactively
 
-1. **Ask user**: "The snow-utils SA_ROLE is not set up. This role has the CREATE EXTERNAL VOLUME privilege. Would you like to create it now? This requires ACCOUNTADMIN role."
+The script will:
+1. Prompt for SA Role name (default: SNOW_UTILS_SA)
+2. Prompt for Database name (default: SNOW_UTILS)
+3. Check if infrastructure exists
+4. Offer to create it if missing (requires ACCOUNTADMIN)
 
-2. **If user agrees**, run setup:
-   ```bash
-   uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
-     -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-     --role "${SA_ROLE:-SA_ROLE}" --db "${SNOW_UTILS_DB:-SNOW_UTILS}" --auto-setup
-   ```
+**After setup completes, update `.env`** with the values user provided:
+- `SA_ROLE=<user_role>`
+- `SNOW_UTILS_DB=<user_db>`
 
-3. **If user declines**, they can proceed if their current role has CREATE EXTERNAL VOLUME privilege (e.g., ACCOUNTADMIN, SYSADMIN).
+**If user declines setup**, they can proceed if their current role has CREATE EXTERNAL VOLUME privilege (e.g., ACCOUNTADMIN, SYSADMIN).
 
 **If exit code is 0**: Continue to Step 3.
 
-### Step 3: Gather Requirements
+### Step 3: Check Existing External Volume
+
+**Check if EXTERNAL_VOLUME_NAME is set in .env:**
+```bash
+grep "^EXTERNAL_VOLUME_NAME=" .env | cut -d= -f2
+```
+
+**If EXTERNAL_VOLUME_NAME has a value**, check if it exists in Snowflake:
+```bash
+snow sql -q "SHOW EXTERNAL VOLUMES LIKE '<EXTERNAL_VOLUME_NAME>'" -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" --format json
+```
+
+**If external volume exists**: Ask user if they want to:
+1. Use the existing volume (skip creation)
+2. Delete and recreate it
+3. Create a new volume with different name
+
+**If EXTERNAL_VOLUME_NAME is empty or volume doesn't exist**: Continue to Step 4.
+
+### Step 4: Gather Requirements
 
 **Ask user:**
 ```
@@ -96,11 +131,12 @@ Update these variables in `.env`:
 
 This ensures values are saved for future runs and the script can read them.
 
-### Step 4: Preview (Dry Run)
+### Step 5: Preview (Dry Run)
 
 **Execute:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
   create --bucket <BUCKET> --region <REGION> --dry-run
 ```
 
@@ -154,11 +190,12 @@ This is the final trust policy after Snowflake provides its IAM user ARN.
 
 **⚠️ STOP**: Get approval before creating resources.
 
-### Step 5: Create Resources
+### Step 6: Create Resources
 
 **Execute:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
   create --bucket <BUCKET> --region <REGION> --output json
 ```
 
@@ -166,11 +203,12 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 
 **On failure**: Rollback is automatic. Present error and ask user how to proceed.
 
-### Step 6: Verify
+### Step 7: Verify
 
 **Execute:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
   verify --volume-name <VOLUME_NAME>
 ```
 
@@ -180,19 +218,19 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 
 ### check_setup.py
 
-**Description**: Pre-flight check for snow-utils infrastructure.
+**Description**: Pre-flight check for snow-utils infrastructure. Prompts interactively for values.
 
 **Usage:**
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
-  [--role SA_ROLE] [--db SNOW_UTILS] [--auto-setup] [--quiet]
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
 ```
 
+**⚠️ DO NOT ADD ANY FLAGS. The script will prompt interactively.**
+
 **Options:**
-- `--role`, `-r`: SA role name (default: SA_ROLE, env: SA_ROLE)
-- `--db`, `-d`: Database name (default: SNOW_UTILS, env: SNOW_UTILS_DB)
-- `--auto-setup`: Automatically run setup if needed (no prompt)
-- `--quiet`, `-q`: Exit 0 if ready, 1 if not (no output)
+- `--quiet`, `-q`: Exit 0 if ready, 1 if not (no output, for scripting only)
+
+Uses the active Snowflake connection from SNOWFLAKE_DEFAULT_CONNECTION_NAME.
 
 **Exit codes:**
 - 0: Infrastructure ready
@@ -202,6 +240,9 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
 ### extvolume.py
 
 **Description**: Creates and manages Snowflake external volumes with S3 backend.
+
+**Global Options:**
+- `--connection`, `-c`: Snowflake connection name [env: SNOWFLAKE_DEFAULT_CONNECTION_NAME]
 
 **Commands:**
 - `create`: Create S3 bucket, IAM role/policy, external volume
@@ -213,7 +254,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
 **Create Usage:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
-  [--region REGION] [--prefix PREFIX] [--no-prefix] \
+  [-c CONNECTION] [--region REGION] [--prefix PREFIX] [--no-prefix] \
   create --bucket BUCKET [--dry-run] [--output json]
 ```
 
@@ -230,16 +271,17 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 **Delete Usage:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
-  delete --bucket BUCKET [--delete-bucket] [--force]
+  [-c CONNECTION] delete --bucket BUCKET [--delete-bucket] [--force]
 ```
 
 ## Stopping Points
 
 - ✋ Step 1: If environment checks fail
-- ✋ Step 2: If SA_ROLE setup needed (optional for this skill)
-- ✋ Step 3: After gathering requirements
-- ✋ Step 4: After dry-run preview (get approval)
-- ✋ Step 5: If creation fails
+- ✋ Step 2: Interactive prompts for SA_ROLE/SNOW_UTILS_DB, then setup if needed
+- ✋ Step 3: If external volume already exists (ask user what to do)
+- ✋ Step 4: After gathering requirements
+- ✋ Step 5: After dry-run preview (get approval)
+- ✋ Step 6: If creation fails
 
 ## Output
 
@@ -251,7 +293,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 
 ## Troubleshooting
 
-**Infrastructure not set up**: Run `check_setup.py --auto-setup` to create SA_ROLE with CREATE EXTERNAL VOLUME privilege. Alternatively, use ACCOUNTADMIN or SYSADMIN.
+**Infrastructure not set up**: Run `check_setup.py` interactively or with `--auto-setup` to create SA_ROLE with CREATE EXTERNAL VOLUME privilege. Alternatively, use ACCOUNTADMIN or SYSADMIN.
 
 **IAM propagation delay**: Script uses exponential backoff, but may still timeout. Run `verify` after a minute.
 

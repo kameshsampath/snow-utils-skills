@@ -334,13 +334,8 @@ TYPE_CHOICES = ["ipv4", "host_port", "private_host_port", "awsvpceid"]
 @click.group()
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--debug", "-d", is_flag=True, help="Enable debug output")
-@click.option(
-    "--connection", "-c",
-    envvar="SNOWFLAKE_DEFAULT_CONNECTION_NAME",
-    help="Snowflake connection name (from ~/.snowflake/config.toml)",
-)
 @click.pass_context
-def cli(ctx: click.Context, verbose: bool, debug: bool, connection: str | None) -> None:
+def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
     """
     Snowflake Network Rule Manager.
 
@@ -352,7 +347,7 @@ def cli(ctx: click.Context, verbose: bool, debug: bool, connection: str | None) 
       rule    - Manage network rules (create, list, delete)
       policy  - Manage network policies (create, list, delete)
     """
-    set_snow_cli_options(verbose=verbose, debug=debug, connection=connection)
+    set_snow_cli_options(verbose=verbose, debug=debug)
     ctx.ensure_object(dict)
 
 
