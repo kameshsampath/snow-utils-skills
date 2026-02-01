@@ -34,6 +34,7 @@ class SnowCLIOptions:
     verbose: bool = False
     debug: bool = False
     mask_sensitive: bool = True
+    connection: str | None = None
 
     def get_flags(self) -> list[str]:
         """Get CLI flags based on options."""
@@ -42,6 +43,8 @@ class SnowCLIOptions:
             flags.append("--debug")
         elif self.verbose:
             flags.append("--verbose")
+        if self.connection:
+            flags.extend(["-c", self.connection])
         return flags
 
 
@@ -151,11 +154,16 @@ def is_masking_enabled() -> bool:
 
 
 def set_snow_cli_options(
-    verbose: bool = False, debug: bool = False, mask_sensitive: bool = True
+    verbose: bool = False,
+    debug: bool = False,
+    mask_sensitive: bool = True,
+    connection: str | None = None,
 ) -> None:
     """Set global snow CLI options."""
     global _snow_cli_options
-    _snow_cli_options = SnowCLIOptions(verbose=verbose, debug=debug, mask_sensitive=mask_sensitive)
+    _snow_cli_options = SnowCLIOptions(
+        verbose=verbose, debug=debug, mask_sensitive=mask_sensitive, connection=connection
+    )
 
 
 def get_snow_cli_options() -> SnowCLIOptions:

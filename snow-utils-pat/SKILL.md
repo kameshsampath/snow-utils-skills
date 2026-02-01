@@ -40,26 +40,45 @@ Creates service users, network policies, authentication policies, and Programmat
    - Extract defaults from test output: Role, Database, Warehouse
    - Set `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<selected_connection>` in .env
 
-4. **Check** required privileges:
-   - CREATE USER (or use existing user)
-   - CREATE NETWORK RULE, NETWORK POLICY
-   - CREATE AUTHENTICATION POLICY
+### Step 2: Check Infrastructure (REQUIRED)
 
-**If any check fails**: Stop and help user resolve.
+**Run pre-flight check with user's connection:**
+```bash
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
+  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
+  --role "${SA_ROLE:-SA_ROLE}" --db "${SNOW_UTILS_DB:-SNOW_UTILS}" --quiet
+```
 
-### Step 2: Gather Requirements
+**If exit code is non-zero (infrastructure missing):**
+
+1. **Ask user**: "The snow-utils infrastructure (SA_ROLE and SNOW_UTILS_DB) is not set up. Would you like to create it now? This requires ACCOUNTADMIN role."
+
+2. **If user agrees**, run setup:
+   ```bash
+   uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
+     -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
+     --role "${SA_ROLE:-SA_ROLE}" --db "${SNOW_UTILS_DB:-SNOW_UTILS}" --auto-setup
+   ```
+
+3. **If user declines**, explain they need to run setup first:
+   - `snow sql -f snow-utils-setup.sql --templating=all --role ACCOUNTADMIN`
+   - Or use the snow-bin-utils project: `task snow-utils:setup`
+
+**If exit code is 0**: Continue to Step 3.
+
+### Step 3: Gather Requirements
 
 **Use connection test results as prompt defaults** (from Step 1):
-- Database: use test output's Database (if not "not set")
-- Role: use test output's Role
+- Database: use SNOW_UTILS_DB from .env (default: SNOW_UTILS)
+- Role: use SA_ROLE from .env (default: SA_ROLE)
 
 **Ask user:**
 ```
 To create the PAT:
 1. Service user name:
-2. PAT role (default: <connection_role>):
-3. Admin role (default: same as PAT role):
-4. Database for policy objects (default: <connection_database>):
+2. PAT role (the role this service account can use):
+3. Admin role (default: SA_ROLE - the role with privileges to create policies):
+4. Database for policy objects (default: SNOW_UTILS):
 5. PAT expiry days (default: 30):
 ```
 
@@ -69,18 +88,17 @@ To create the PAT:
 
 Update these variables in `.env`:
 - `SA_USER=<user_service_user_name>`
-- `SA_ROLE=<user_pat_role>`
-- `SA_ADMIN_ROLE=<user_admin_role>`
-- `PAT_OBJECTS_DB=<user_database>`
+- `SA_ROLE=<user_admin_role>` (if different from default)
+- `SNOW_UTILS_DB=<user_database>` (if different from default)
 
 This ensures values are saved for future runs (e.g., rotate, remove commands).
 
-### Step 3: Preview (Dry Run)
+### Step 4: Preview (Dry Run)
 
 **Execute:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  create --user <USER> --role <ROLE> --db <DB> --dry-run
+  create --user <USER> --role <PAT_ROLE> --db <DB> --dry-run
 ```
 
 **CRITICAL: You MUST show ALL SQL from the dry-run output. Do NOT skip or summarize.**
@@ -116,12 +134,12 @@ ALTER USER IF EXISTS ... ADD PAT ...;
 
 **⚠️ STOP**: Get approval before creating resources.
 
-### Step 4: Create Resources
+### Step 5: Create Resources
 
 **Execute:**
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  create --user <USER> --role <ROLE> --db <DB> --output json
+  create --user <USER> --role <PAT_ROLE> --db <DB> --output json
 ```
 
 **On success**: 
@@ -130,7 +148,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 
 **On failure**: Present error and remediation steps.
 
-### Step 5: Verify Connection
+### Step 6: Verify Connection
 
 If `--skip-verify` was not used, connection is already verified.
 
@@ -141,6 +159,27 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 ```
 
 ## Tools
+
+### check_setup.py
+
+**Description**: Pre-flight check for snow-utils infrastructure.
+
+**Usage:**
+```bash
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
+  [--role SA_ROLE] [--db SNOW_UTILS] [--auto-setup] [--quiet]
+```
+
+**Options:**
+- `--role`, `-r`: SA role name (default: SA_ROLE, env: SA_ROLE)
+- `--db`, `-d`: Database name (default: SNOW_UTILS, env: SNOW_UTILS_DB)
+- `--auto-setup`: Automatically run setup if needed (no prompt)
+- `--quiet`, `-q`: Exit 0 if ready, 1 if not (no output)
+
+**Exit codes:**
+- 0: Infrastructure ready
+- 1: Infrastructure missing (setup declined or failed)
+- 2: Error during check
 
 ### pat.py
 
@@ -181,9 +220,10 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 ## Stopping Points
 
 - ✋ Step 1: If environment checks fail
-- ✋ Step 2: After gathering requirements  
-- ✋ Step 3: After dry-run preview (get approval)
-- ✋ Step 4: If creation fails
+- ✋ Step 2: If infrastructure missing (ask user to set up)
+- ✋ Step 3: After gathering requirements  
+- ✋ Step 4: After dry-run preview (get approval)
+- ✋ Step 5: If creation fails
 
 ## Output
 
@@ -196,9 +236,11 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 
 ## Troubleshooting
 
+**Infrastructure not set up**: Run `check_setup.py --auto-setup` or manually run setup with ACCOUNTADMIN.
+
 **Network policy blocking**: Ensure your IP is in the network rule. Run with `--local-ip` to specify.
 
-**Permission denied**: Admin role needs CREATE NETWORK RULE, CREATE NETWORK POLICY, CREATE AUTHENTICATION POLICY privileges.
+**Permission denied**: SA_ROLE needs CREATE NETWORK RULE, CREATE NETWORK POLICY, CREATE AUTHENTICATION POLICY privileges. Run `task snow-utils:setup` to create role with proper grants.
 
 **PAT already exists**: Use `--rotate` to replace existing PAT.
 
@@ -210,3 +252,4 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 - Network policy restricts access to specified IPs only
 - Auth policy enforces PAT-only authentication (no password)
 - Tokens have configurable expiry (default 30 days, max 365)
+- SA_ROLE has scoped privileges with no grant delegation

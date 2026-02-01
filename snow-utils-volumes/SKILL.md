@@ -44,7 +44,33 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Ice
 
 **If any check fails**: Stop and help user resolve.
 
-### Step 2: Gather Requirements
+### Step 2: Check Infrastructure (RECOMMENDED)
+
+External volumes are account-level objects that require CREATE EXTERNAL VOLUME privilege. The SA_ROLE created by snow-utils:setup has this privilege.
+
+**Run pre-flight check with user's connection:**
+```bash
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
+  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
+  --role "${SA_ROLE:-SA_ROLE}" --db "${SNOW_UTILS_DB:-SNOW_UTILS}" --quiet
+```
+
+**If exit code is non-zero (infrastructure missing):**
+
+1. **Ask user**: "The snow-utils SA_ROLE is not set up. This role has the CREATE EXTERNAL VOLUME privilege. Would you like to create it now? This requires ACCOUNTADMIN role."
+
+2. **If user agrees**, run setup:
+   ```bash
+   uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
+     -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
+     --role "${SA_ROLE:-SA_ROLE}" --db "${SNOW_UTILS_DB:-SNOW_UTILS}" --auto-setup
+   ```
+
+3. **If user declines**, they can proceed if their current role has CREATE EXTERNAL VOLUME privilege (e.g., ACCOUNTADMIN, SYSADMIN).
+
+**If exit code is 0**: Continue to Step 3.
+
+### Step 3: Gather Requirements
 
 **Ask user:**
 ```
@@ -70,7 +96,7 @@ Update these variables in `.env`:
 
 This ensures values are saved for future runs and the script can read them.
 
-### Step 3: Preview (Dry Run)
+### Step 4: Preview (Dry Run)
 
 **Execute:**
 ```bash
@@ -128,7 +154,7 @@ This is the final trust policy after Snowflake provides its IAM user ARN.
 
 **⚠️ STOP**: Get approval before creating resources.
 
-### Step 4: Create Resources
+### Step 5: Create Resources
 
 **Execute:**
 ```bash
@@ -140,7 +166,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 
 **On failure**: Rollback is automatic. Present error and ask user how to proceed.
 
-### Step 5: Verify
+### Step 6: Verify
 
 **Execute:**
 ```bash
@@ -151,6 +177,27 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 **Present** verification result.
 
 ## Tools
+
+### check_setup.py
+
+**Description**: Pre-flight check for snow-utils infrastructure.
+
+**Usage:**
+```bash
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py \
+  [--role SA_ROLE] [--db SNOW_UTILS] [--auto-setup] [--quiet]
+```
+
+**Options:**
+- `--role`, `-r`: SA role name (default: SA_ROLE, env: SA_ROLE)
+- `--db`, `-d`: Database name (default: SNOW_UTILS, env: SNOW_UTILS_DB)
+- `--auto-setup`: Automatically run setup if needed (no prompt)
+- `--quiet`, `-q`: Exit 0 if ready, 1 if not (no output)
+
+**Exit codes:**
+- 0: Infrastructure ready
+- 1: Infrastructure missing (setup declined or failed)
+- 2: Error during check
 
 ### extvolume.py
 
@@ -189,9 +236,10 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 ## Stopping Points
 
 - ✋ Step 1: If environment checks fail
-- ✋ Step 2: After gathering requirements
-- ✋ Step 3: After dry-run preview (get approval)
-- ✋ Step 4: If creation fails
+- ✋ Step 2: If SA_ROLE setup needed (optional for this skill)
+- ✋ Step 3: After gathering requirements
+- ✋ Step 4: After dry-run preview (get approval)
+- ✋ Step 5: If creation fails
 
 ## Output
 
@@ -203,6 +251,8 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 
 ## Troubleshooting
 
+**Infrastructure not set up**: Run `check_setup.py --auto-setup` to create SA_ROLE with CREATE EXTERNAL VOLUME privilege. Alternatively, use ACCOUNTADMIN or SYSADMIN.
+
 **IAM propagation delay**: Script uses exponential backoff, but may still timeout. Run `verify` after a minute.
 
 **S3 403 error**: Bucket name already exists in another account. Choose different name.
@@ -210,3 +260,10 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 **Trust policy mismatch**: Run `update-trust` to re-sync IAM trust policy.
 
 **External volume verification failed**: Check IAM role trust policy includes Snowflake's IAM user ARN.
+
+## Security Notes
+
+- S3 bucket has versioning enabled for data protection
+- IAM role uses external ID for secure cross-account access
+- SA_ROLE has scoped CREATE EXTERNAL VOLUME privilege with no grant delegation
+- Trust policy is specific to Snowflake's IAM user (not wildcard)
