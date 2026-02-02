@@ -110,18 +110,18 @@ def get_local_ip() -> str:
 
 
 def collect_ipv4_cidrs(
-    with_local: bool = True,
-    with_gh: bool = False,
-    with_google: bool = False,
+    allow_local: bool = True,
+    allow_gh: bool = False,
+    allow_google: bool = False,
     extra_cidrs: list[str] | None = None,
 ) -> list[str]:
     """
     Collect IPv4 CIDRs from enabled presets and extra values.
 
     Args:
-        with_local: Include current public IP (default: True)
-        with_gh: Include GitHub Actions runner IPs
-        with_google: Include Google App Scripts IPs
+        allow_local: Include current public IP (default: True)
+        allow_gh: Include GitHub Actions runner IPs
+        allow_google: Include Google App Scripts IPs
         extra_cidrs: Additional CIDRs to include
 
     Returns:
@@ -129,13 +129,13 @@ def collect_ipv4_cidrs(
     """
     cidrs: list[str] = []
 
-    if with_local:
+    if allow_local:
         cidrs.append(get_local_ip())
 
-    if with_gh:
+    if allow_gh:
         cidrs.extend(get_github_actions_ips())
 
-    if with_google:
+    if allow_google:
         cidrs.extend(get_google_ips())
 
     if extra_cidrs:

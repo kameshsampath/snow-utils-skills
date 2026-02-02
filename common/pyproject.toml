@@ -1,0 +1,19 @@
+[project]
+name = "snow-utils-common"
+version = "0.1.0"
+description = "Common utilities for snow-utils skills"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Kamesh Sampath" }]
+dependencies = [
+    "click>=8.1.0",
+    "requests>=2.31.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/snow_utils_common"]

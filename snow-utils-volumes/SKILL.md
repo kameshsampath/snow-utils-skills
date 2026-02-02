@@ -9,279 +9,386 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Ice
 
 ## Workflow
 
+**📋 PREREQUISITE:** This skill requires `snow-utils-pat` to be run first. If SA_PAT is not set in .env, stop and direct user to run snow-utils-pat.
+
 **🚫 FORBIDDEN ACTIONS - NEVER DO THESE:**
-- NEVER run SQL queries to discover/find/check SA_ROLE, SNOW_UTILS_DB, or EXTERNAL_VOLUME_NAME
-- NEVER run `SHOW ROLES`, `SHOW DATABASES`, `SHOW EXTERNAL VOLUMES` to populate empty .env values
-- NEVER auto-populate empty values by querying Snowflake
-- If .env values are empty, they stay empty until the user provides them via interactive prompt
 
-### Step 1: Check Environment
+- NEVER run SQL queries to discover/find/check values (no SHOW ROLES, SHOW DATABASES, SHOW EXTERNAL VOLUMES)
+- NEVER auto-populate empty .env values by querying Snowflake
+- NEVER use flags that bypass user interaction: `--yes`, `-y`, `--auto-setup`, `--auto-approve`, `--quiet`, `--force`, `--non-interactive`
+- NEVER assume user consent - always ask and wait for explicit confirmation
+- NEVER skip SQL/JSON in dry-run output - always show BOTH summary AND full SQL/JSON
+- If .env values are empty, prompt user or run check_setup.py
 
-**Actions:**
+**✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
-1. **Verify** project has required files:
+**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
+
+### Step 0: Check Prerequisites
+
+**Check required tools are installed:**
+
+```bash
+command -v uv >/dev/null 2>&1 && echo "uv: OK" || echo "uv: MISSING"
+command -v snow >/dev/null 2>&1 && echo "snow: OK" || echo "snow: MISSING"
+command -v aws >/dev/null 2>&1 && echo "aws: OK" || echo "aws: MISSING"
+```
+
+**If any tool is MISSING, stop and provide installation instructions:**
+
+| Tool | Install Command |
+|------|-----------------|
+| `uv` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| `snow` | `pip install snowflake-cli` or `uv tool install snowflake-cli` |
+| `aws` | `brew install awscli` or see [AWS CLI Install](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) |
+
+**⚠️ STOP**: Do not proceed until all prerequisites are installed.
+
+### Step 1: Load and Merge Environment
+
+1. **Check if .env exists:**
+
    ```bash
    ls -la .env 2>/dev/null || echo "missing"
    ```
 
-2. **If .env missing**, copy EXACTLY from `.env.example`:
+2. **If .env missing**, copy from .env.example:
+
    ```bash
    cp <SKILL_DIR>/.env.example .env
    ```
-   
-   **If .env exists**, MERGE new settings - do NOT overwrite:
-   - Read existing .env
-   - Add only missing keys from `.env.example`
-   - Preserve user's existing values
 
-3. **Verify** AWS credentials:
+   **If .env exists**, merge missing keys from .env.example:
+   - Read existing .env
+   - Add only keys that don't exist (preserve all existing values)
+   - Keys to check: SNOWFLAKE_DEFAULT_CONNECTION_NAME, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_ACCOUNT_URL, SA_ROLE, SA_USER, SNOW_UTILS_DB, SA_PAT, EXTERNAL_VOLUME_NAME, BUCKET, AWS_REGION, EXTVOLUME_PREFIX
+
+3. **Check connection details in .env:**
+
+   ```bash
+   grep -E "^SNOWFLAKE_(DEFAULT_CONNECTION_NAME|ACCOUNT|USER|ACCOUNT_URL)=" .env
+   ```
+
+**If SNOWFLAKE_DEFAULT_CONNECTION_NAME is empty:**
+
+- List connections:
+
+     ```bash
+     snow connection list
+     ```
+
+- Ask user to select a connection
+- Test connection and extract details:
+
+     ```bash
+     snow connection test -c <selected_connection> --format json
+     ```
+
+- Update .env with:
+  - `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<selected>`
+  - `SNOWFLAKE_ACCOUNT=<account from output>`
+  - `SNOWFLAKE_USER=<user from output>`
+  - `SNOWFLAKE_ACCOUNT_URL=https://<host from output>`
+
+**If connection details already present:** Skip to Step 2.
+
+1. **Verify AWS credentials:**
+
    ```bash
    aws sts get-caller-identity
    ```
-   Show the output to user (Account ID, User ARN) to confirm correct AWS account.
 
-4. **Verify** Snowflake connection:
-   ```bash
-   snow connection list
-   ```
-   If user needs to choose a connection, ask them and then:
-   - Set ONLY `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<chosen_connection>` in .env
+   Show output to confirm correct AWS account.
 
-**⚠️ CRITICAL RULES FOR STEP 1:**
-- Do NOT run any SQL queries (no SHOW ROLES, SHOW DATABASES, SHOW EXTERNAL VOLUMES)
-- Do NOT try to discover or infer SA_ROLE, SNOW_UTILS_DB, or EXTERNAL_VOLUME_NAME
-- Do NOT set these values - leave them empty in .env
-- The ONLY value to set is SNOWFLAKE_DEFAULT_CONNECTION_NAME
-- Proceed to Step 2 - the script will prompt user for values
+**If any check fails:** Stop and help user resolve.
 
-**⚠️ STOP**: After setting connection, proceed DIRECTLY to Step 2. Do not run any additional commands.
+### Step 2: Check Infrastructure (Conditional)
 
-**If any check fails**: Stop and help user resolve.
+**IMPORTANT:** Source .env with export to use the configured connection:
 
-### Step 2: Check Infrastructure (RECOMMENDED)
-
-External volumes are account-level objects that require CREATE EXTERNAL VOLUME privilege. The SA_ROLE created by snow-utils:setup has this privilege.
-
-**Run pre-flight check with NO FLAGS** (script will prompt interactively):
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+set -a && source .env && set +a
 ```
 
-**⚠️ CRITICAL: Run the command EXACTLY as shown above.**
-- Do NOT add any flags
-- Do NOT source .env before running
-- Let the script prompt the user interactively
+Read SA_ROLE, SA_USER, SNOW_UTILS_DB, and SA_PAT from .env:
 
-The script will:
-1. Prompt for SA Role name (default: SNOW_UTILS_SA)
-2. Prompt for Database name (default: SNOW_UTILS)
-3. Check if infrastructure exists
-4. Offer to create it if missing (requires ACCOUNTADMIN)
+```bash
+grep -E "^(SA_ROLE|SA_USER|SNOW_UTILS_DB|SA_PAT)=" .env
+```
 
-**After setup completes, update `.env`** with the values user provided:
-- `SA_ROLE=<user_role>`
-- `SNOW_UTILS_DB=<user_db>`
+**If SA_ROLE or SNOW_UTILS_DB is empty**, run check_setup.py first:
 
-**If user declines setup**, they can proceed if their current role has CREATE EXTERNAL VOLUME privilege (e.g., ACCOUNTADMIN, SYSADMIN).
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+```
 
-**If exit code is 0**: Continue to Step 3.
+**If SA_PAT is empty:**
+
+⚠️ **STOP** - Service account PAT is required before creating volumes.
+
+Tell the user:
+
+```
+SA_PAT is not set. You need to create a PAT for the service account first.
+
+Run the snow-utils-pat skill to create the PAT:
+  "Create a PAT for service account"
+
+This ensures the external volume is created using the service account credentials.
+```
+
+**Do NOT proceed** until SA_PAT is populated in .env.
+
+**If ALL values present (SA_ROLE, SA_USER, SNOW_UTILS_DB, SA_PAT):** Continue to Step 3.
 
 ### Step 3: Check Existing External Volume
 
-**Check if EXTERNAL_VOLUME_NAME is set in .env:**
+Read EXTERNAL_VOLUME_NAME from .env:
+
 ```bash
 grep "^EXTERNAL_VOLUME_NAME=" .env | cut -d= -f2
 ```
 
-**If EXTERNAL_VOLUME_NAME has a value**, check if it exists in Snowflake:
+**If EXTERNAL_VOLUME_NAME has a value**, check if it exists:
+
 ```bash
-snow sql -q "SHOW EXTERNAL VOLUMES LIKE '<EXTERNAL_VOLUME_NAME>'" -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" --format json
+set -a && source .env && set +a && snow sql -q "SHOW EXTERNAL VOLUMES LIKE '${EXTERNAL_VOLUME_NAME}'" --format json
 ```
 
-**If external volume exists**: Ask user if they want to:
-1. Use the existing volume (skip creation)
-2. Delete and recreate it
-3. Create a new volume with different name
+**If volume exists:** Ask user:
 
-**If EXTERNAL_VOLUME_NAME is empty or volume doesn't exist**: Continue to Step 4.
+1. Use existing volume (skip to Step 7)
+2. Delete and recreate
+3. Create new volume with different name
+
+**If EXTERNAL_VOLUME_NAME is empty or volume doesn't exist:** Continue to Step 4.
 
 ### Step 4: Gather Requirements
 
-**Ask user:**
+Read SNOWFLAKE_USER from .env for default prefix:
+
+```bash
+grep "^SNOWFLAKE_USER=" .env | cut -d= -f2
 ```
-To create the external volume:
-1. Bucket name (base name, will be prefixed): 
-2. AWS region (default: us-west-2):
-3. Prefix for resources (default: your username):
-4. Allow writes? (default: yes):
+
+**Ask user with prefix explanation:**
+
+```
+External Volume Configuration:
+
+> **Note:** By default, all AWS resources (S3 bucket, IAM role, IAM policy) are prefixed 
+> with your username to avoid naming conflicts in shared AWS accounts.
+> Example: If you enter "iceberg-data" as bucket name with prefix "kameshs":
+>   - S3 Bucket: kameshs-iceberg-data
+>   - IAM Role: kameshs-iceberg-data-snowflake-role
+>   - External Volume: KAMESHS_ICEBERG_DATA_EXTERNAL_VOLUME
+> You can disable prefixing if you prefer raw names.
+
+1. Bucket name (base name): 
+2. AWS region [default: us-west-2]:
+3. Use username prefix? [Y/n]:
+   - If yes, prefix will be: <SNOWFLAKE_USER>
+   - If no, resources will use raw bucket name
+4. Allow writes? [default: yes]:
 ```
 
 **⚠️ STOP**: Wait for user input.
 
-**After user provides input, update `.env` with their values:**
-```bash
-# Update .env with user inputs (merge, don't overwrite existing values)
-```
+**After user provides input, update .env:**
 
-Update these variables in `.env`:
 - `BUCKET=<user_bucket_name>`
 - `AWS_REGION=<user_region>`
-- `EXTVOLUME_PREFIX=<user_prefix>`
-- `EXTERNAL_VOLUME_NAME=<PREFIX>_<BUCKET>_EXTERNAL_VOLUME`
-
-This ensures values are saved for future runs and the script can read them.
+- `EXTVOLUME_PREFIX=<user_prefix or empty if no prefix>`
+- `EXTERNAL_VOLUME_NAME=<PREFIX>_<BUCKET>_EXTERNAL_VOLUME` (or `<BUCKET>_EXTERNAL_VOLUME` if no prefix)
 
 ### Step 5: Preview (Dry Run)
 
-**Execute:**
+**IMPORTANT:** The `--region` flag is a GLOBAL option (before `create`), not on `create`.
+
+**Execute (with prefix):**
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
-  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-  create --bucket <BUCKET> --region <REGION> --dry-run
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  --region ${AWS_REGION} \
+  create --bucket ${BUCKET} --dry-run
 ```
 
-**CRITICAL: Display the ACTUAL command output to the user.**
+**Execute (without prefix):**
 
-The dry-run output includes:
-- **Step 2: IAM Policy JSON** - Full policy document 
-- **Step 3: IAM Trust Policy JSON** - Initial and final trust policies
-- **Step 4: Snowflake SQL** - CREATE EXTERNAL VOLUME statement
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  --region ${AWS_REGION} --no-prefix \
+  create --bucket ${BUCKET} --dry-run
+```
 
-**YOU MUST copy/paste the JSON and SQL directly from the command output.**
+**🔴 CRITICAL: SHOW BOTH SUMMARY AND FULL SQL/JSON**
 
-Format the output for the user as follows:
+After running dry-run, display output in TWO parts:
 
-**Resources to be created:**
-- S3 Bucket: `<from output>`
-- IAM Policy: `<from output>`  
-- IAM Role: `<from output>`
-- External Volume: `<from output>`
+**Part 1 - Resource Summary (brief):**
 
-**1. IAM Policy (S3 Access Permissions):**
-This policy grants Snowflake access to the S3 bucket.
+```
+AWS Resources:
+  S3 Bucket:        kameshs-hirc-demo
+  IAM Role ARN:     arn:aws:iam::<ACCOUNT_ID>:role/kameshs-hirc-demo-snowflake-role
+  IAM Policy ARN:   arn:aws:iam::<ACCOUNT_ID>:policy/kameshs-hirc-demo-snowflake-policy
+
+Snowflake Objects (account-level):
+  External Volume:  KAMESHS_HIRC_DEMO_EXTERNAL_VOLUME
+```
+
+> **Note:** External volumes are account-level objects in Snowflake (no database/schema prefix).
+
+**Part 2 - Full SQL and JSON (MANDATORY - do not skip on first display):**
+
+Show these in formatted code blocks:
+
+**IAM Policy JSON:**
+
 ```json
-<COPY THE FULL JSON FROM "Policy Document:" IN STEP 2 OF OUTPUT>
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion", "s3:DeleteObject", "s3:DeleteObjectVersion"],
+      "Resource": "arn:aws:s3:::bucket-name/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
+      "Resource": "arn:aws:s3:::bucket-name"
+    }
+  ]
+}
 ```
 
-**2. IAM Role Trust Policy (Initial - with placeholder):**
-This is the initial trust policy before Snowflake's IAM user ARN is known.
+**IAM Trust Policy JSON:**
+
 ```json
-<COPY THE FULL JSON FROM "Initial Trust Policy (before Snowflake IAM user is known):" IN STEP 3>
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {"AWS": "<SNOWFLAKE_IAM_USER_ARN>"},
+      "Action": "sts:AssumeRole",
+      "Condition": {"StringEquals": {"sts:ExternalId": "..."}}
+    }
+  ]
+}
 ```
 
-**3. IAM Role Trust Policy (Final - after external volume created):**
-This is the final trust policy after Snowflake provides its IAM user ARN.
-```json
-<COPY THE FULL JSON FROM "Final Trust Policy (after external volume creation):" IN STEP 3>
-```
+**Snowflake SQL:**
 
-**4. Snowflake SQL:**
 ```sql
-<COPY THE CREATE EXTERNAL VOLUME SQL FROM STEP 4 OF OUTPUT>
+CREATE EXTERNAL VOLUME IF NOT EXISTS VOLUME_NAME
+    STORAGE_LOCATIONS = (
+        (
+            NAME = 'storage-location-name'
+            STORAGE_PROVIDER = 'S3'
+            STORAGE_BASE_URL = 's3://bucket/'
+            STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::...:role/...'
+            STORAGE_AWS_EXTERNAL_ID = '...'
+        )
+    )
+    ALLOW_WRITES = TRUE;
 ```
 
-**ALL 4 SECTIONS ABOVE ARE REQUIRED. DO NOT:**
-- Summarize as "aws iam create-policy --policy-name ..."
-- Skip the IAM Policy JSON (S3 permissions)
-- Skip the Initial Trust Policy (with placeholder ARN)
-- Abbreviate or omit any JSON
+**FORBIDDEN:** Showing only summary without SQL/JSON. User MUST see BOTH parts on first display.
 
-**Users MUST review S3 permissions AND trust relationships before approving.**
-
-**⚠️ STOP**: Get approval before creating resources.
+**⚠️ STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 
 ### Step 6: Create Resources
 
-**Execute:**
+**Execute (with prefix):**
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
-  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-  create --bucket <BUCKET> --region <REGION> --output json
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  --region ${AWS_REGION} \
+  create --bucket ${BUCKET} --output json
 ```
 
-**On success**: Show example Iceberg table DDL.
+**Execute (without prefix):**
 
-**On failure**: Rollback is automatic. Present error and ask user how to proceed.
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  --region ${AWS_REGION} --no-prefix \
+  create --bucket ${BUCKET} --output json
+```
+
+**On success:** Update .env with created volume name, show example Iceberg table DDL.
+
+**On failure:** Rollback is automatic. Present error.
 
 ### Step 7: Verify
 
 **Execute:**
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
-  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-  verify --volume-name <VOLUME_NAME>
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  verify --volume-name ${EXTERNAL_VOLUME_NAME}
 ```
 
-**Present** verification result.
+**Present** verification result and summary of created resources.
 
 ## Tools
 
 ### check_setup.py
 
-**Description**: Pre-flight check for snow-utils infrastructure. Prompts interactively for values.
+**Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
 
 **Usage:**
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
 ```
 
-**⚠️ DO NOT ADD ANY FLAGS. The script will prompt interactively.**
+**⚠️ DO NOT ADD ANY FLAGS.**
 
 **Options:**
-- `--quiet`, `-q`: Exit 0 if ready, 1 if not (no output, for scripting only)
 
-Uses the active Snowflake connection from SNOWFLAKE_DEFAULT_CONNECTION_NAME.
-
-**Exit codes:**
-- 0: Infrastructure ready
-- 1: Infrastructure missing (setup declined or failed)
-- 2: Error during check
+- `--quiet`, `-q`: Exit 0 if ready, 1 if not (scripting only)
 
 ### extvolume.py
 
-**Description**: Creates and manages Snowflake external volumes with S3 backend.
+**Description:** Creates and manages Snowflake external volumes with S3 backend.
 
-**Global Options:**
-- `--connection`, `-c`: Snowflake connection name [env: SNOWFLAKE_DEFAULT_CONNECTION_NAME]
+**Global Options (BEFORE command):**
+
+- `-r, --region`: AWS region (default: us-west-2, or AWS_REGION env var)
+- `-p, --prefix`: Custom prefix for AWS resources
+- `--no-prefix`: Disable username prefix
 
 **Commands:**
+
 - `create`: Create S3 bucket, IAM role/policy, external volume
 - `delete`: Remove all resources
 - `verify`: Test external volume connectivity
 - `describe`: Show external volume properties
 - `update-trust`: Re-sync IAM trust policy
 
-**Create Usage:**
-```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
-  [-c CONNECTION] [--region REGION] [--prefix PREFIX] [--no-prefix] \
-  create --bucket BUCKET [--dry-run] [--output json]
-```
+**Create Options:**
 
-**Key Options:**
-- `--bucket`: S3 bucket base name (required)
-- `--region`: AWS region (default: us-west-2)
-- `--prefix`: Resource prefix (default: username)
-- `--no-prefix`: Disable prefix
+- `--bucket`, `-b`: S3 bucket base name (required)
 - `--dry-run`: Preview without creating
 - `--output json`: Machine-readable output
-- `--no-writes`: Read-only volume
-- `--skip-verify`: Skip connectivity check
 
-**Delete Usage:**
+**Correct command structure:**
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
-  [-c CONNECTION] delete --bucket BUCKET [--delete-bucket] [--force]
+extvolume.py [GLOBAL OPTIONS] create [CREATE OPTIONS]
+extvolume.py --region us-west-2 create --bucket my-bucket --dry-run
+extvolume.py --no-prefix create --bucket my-bucket
 ```
 
 ## Stopping Points
 
-- ✋ Step 1: If environment checks fail
-- ✋ Step 2: Interactive prompts for SA_ROLE/SNOW_UTILS_DB, then setup if needed
-- ✋ Step 3: If external volume already exists (ask user what to do)
+- ✋ Step 1: If connection or AWS checks fail
+- ✋ Step 2: If infra check needed (prompts user)
+- ✋ Step 3: If volume exists (ask user what to do)
 - ✋ Step 4: After gathering requirements
 - ✋ Step 5: After dry-run preview (get approval)
-- ✋ Step 6: If creation fails
 
 ## Output
 
@@ -289,23 +396,16 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 - IAM policy for S3 access
 - IAM role with Snowflake trust policy
 - Snowflake external volume
-- Example Iceberg table DDL
+- Updated .env with all values
 
 ## Troubleshooting
 
-**Infrastructure not set up**: Run `check_setup.py` interactively or with `--auto-setup` to create SA_ROLE with CREATE EXTERNAL VOLUME privilege. Alternatively, use ACCOUNTADMIN or SYSADMIN.
+**Connection not found:** Ensure SNOWFLAKE_DEFAULT_CONNECTION_NAME in .env matches a configured connection. Run `snow connection list` to see available connections.
 
-**IAM propagation delay**: Script uses exponential backoff, but may still timeout. Run `verify` after a minute.
+**Infrastructure not set up:** Run check_setup.py - it will prompt and offer to create.
 
-**S3 403 error**: Bucket name already exists in another account. Choose different name.
+**IAM propagation delay:** Script uses exponential backoff. Run `verify` after a minute if needed.
 
-**Trust policy mismatch**: Run `update-trust` to re-sync IAM trust policy.
+**S3 403 error:** Bucket name exists in another account. Choose different name.
 
-**External volume verification failed**: Check IAM role trust policy includes Snowflake's IAM user ARN.
-
-## Security Notes
-
-- S3 bucket has versioning enabled for data protection
-- IAM role uses external ID for secure cross-account access
-- SA_ROLE has scoped CREATE EXTERNAL VOLUME privilege with no grant delegation
-- Trust policy is specific to Snowflake's IAM user (not wildcard)
+**Trust policy mismatch:** Run `update-trust` to re-sync.

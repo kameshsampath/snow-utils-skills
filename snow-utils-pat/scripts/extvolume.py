@@ -35,8 +35,7 @@ from typing import Any
 import boto3
 import click
 from botocore.exceptions import ClientError
-
-from snow_common import (
+from snow_utils_common import (
     mask_sensitive_string,
     run_snow_sql,
     run_snow_sql_stdin,
@@ -76,7 +75,9 @@ def wait_with_backoff(
         if check_fn():
             return True
         if attempt < max_attempts:
-            click.echo(f"  Waiting for {description}... (attempt {attempt}/{max_attempts})")
+            click.echo(
+                f"  Waiting for {description}... (attempt {attempt}/{max_attempts})"
+            )
             time.sleep(delay)
             delay = min(delay * backoff_factor, max_delay)
     return False
@@ -119,7 +120,9 @@ def wait_for_trust_policy(
         except ClientError:
             return False
 
-    if wait_with_backoff(check_trust, "trust policy", max_attempts=6, initial_delay=2.0):
+    if wait_with_backoff(
+        check_trust, "trust policy", max_attempts=6, initial_delay=2.0
+    ):
         click.echo("✓ Trust policy is updated")
     else:
         click.echo("⚠ Trust policy propagation timeout, proceeding anyway...")
@@ -466,7 +469,9 @@ def update_role_trust_policy(
         iam_client.update_assume_role_policy(
             RoleName=role_name, PolicyDocument=json.dumps(trust_policy)
         )
-        click.echo(f"✓ Updated trust policy with Snowflake IAM user: {snowflake_user_arn}")
+        click.echo(
+            f"✓ Updated trust policy with Snowflake IAM user: {snowflake_user_arn}"
+        )
 
     except ClientError as e:
         raise click.ClickException(f"Failed to update trust policy: {e}")
@@ -551,11 +556,15 @@ def describe_external_volume(volume_name: str) -> dict[str, str]:
         prop_value = row.get("property_value", "")
 
         # Storage location details are nested as JSON inside property_value
-        if parent_prop == "STORAGE_LOCATIONS" and prop_name.startswith("STORAGE_LOCATION_"):
+        if parent_prop == "STORAGE_LOCATIONS" and prop_name.startswith(
+            "STORAGE_LOCATION_"
+        ):
             try:
                 location_data = json.loads(prop_value)
                 if "STORAGE_AWS_IAM_USER_ARN" in location_data:
-                    properties["iam_user_arn"] = location_data["STORAGE_AWS_IAM_USER_ARN"]
+                    properties["iam_user_arn"] = location_data[
+                        "STORAGE_AWS_IAM_USER_ARN"
+                    ]
                 if "STORAGE_AWS_EXTERNAL_ID" in location_data:
                     properties["external_id"] = location_data["STORAGE_AWS_EXTERNAL_ID"]
             except json.JSONDecodeError:
@@ -566,9 +575,11 @@ def describe_external_volume(volume_name: str) -> dict[str, str]:
             "Could not find STORAGE_AWS_IAM_USER_ARN in external volume description"
         )
 
-    iam_user_arn = properties.get('iam_user_arn')
-    external_id = properties.get('external_id')
-    click.echo(f"✓ Snowflake IAM User ARN: {mask_sensitive_string(iam_user_arn, 'arn')}")
+    iam_user_arn = properties.get("iam_user_arn")
+    external_id = properties.get("external_id")
+    click.echo(
+        f"✓ Snowflake IAM User ARN: {mask_sensitive_string(iam_user_arn, 'arn')}"
+    )
     click.echo(f"✓ External ID: {mask_sensitive_string(external_id, 'external_id')}")
 
     return properties
@@ -663,7 +674,12 @@ def verify_external_volume(volume_name: str) -> None:
 )
 @click.pass_context
 def cli(
-    ctx: click.Context, region: str, prefix: str | None, no_prefix: bool, verbose: bool, debug: bool
+    ctx: click.Context,
+    region: str,
+    prefix: str | None,
+    no_prefix: bool,
+    verbose: bool,
+    debug: bool,
 ) -> None:
     """
     Snowflake External Volume Manager
@@ -753,7 +769,8 @@ def cli(
     help="Preview what would be created without making changes",
 )
 @click.option(
-    "--force", "-f",
+    "--force",
+    "-f",
     is_flag=True,
     help="Overwrite existing external volume (CREATE OR REPLACE)",
 )
@@ -812,7 +829,9 @@ def create(
     """
     # Validate bucket name (no dots allowed)
     if "." in bucket:
-        raise click.ClickException("Bucket names cannot contain dots (S3 SSL limitation)")
+        raise click.ClickException(
+            "Bucket names cannot contain dots (S3 SSL limitation)"
+        )
 
     region = ctx.obj["region"]
     prefix = ctx.obj.get("prefix")
@@ -821,10 +840,14 @@ def create(
     aws_bucket_name = to_aws_name(bucket, prefix)
     aws_role_name = role_name or to_aws_name(f"{bucket}-snowflake-role", prefix)
     aws_policy_name = policy_name or to_aws_name(f"{bucket}-snowflake-policy", prefix)
-    aws_storage_location = storage_location_name or to_aws_name(f"{bucket}-s3-{region}", prefix)
+    aws_storage_location = storage_location_name or to_aws_name(
+        f"{bucket}-s3-{region}", prefix
+    )
 
     # Generate Snowflake names (uppercase, underscores, SQL-safe)
-    sf_volume_name = volume_name or to_sql_identifier(f"{bucket}_external_volume", prefix)
+    sf_volume_name = volume_name or to_sql_identifier(
+        f"{bucket}_external_volume", prefix
+    )
     # Generate a unique external ID for security (prevents confused deputy problem)
     sf_external_id = external_id or generate_external_id(bucket, prefix)
 
@@ -889,7 +912,8 @@ def create(
         click.echo("Snowflake Objects (UPPERCASE, underscores):")
         click.echo(f"  External Volume:  {config.volume_name}")
         ext_id_display = (
-            config.external_id if dry_run
+            config.external_id
+            if dry_run
             else mask_sensitive_string(config.external_id, "external_id")
         )
         click.echo(f"  External ID:      {ext_id_display}")
@@ -922,7 +946,9 @@ def create(
         click.echo("Step 2: Create IAM Policy")
         click.echo("─" * 60)
         click.echo(f"Policy Name: {config.policy_name}")
-        click.echo(f"Policy ARN:  arn:aws:iam::{account_id}:policy/{config.policy_name}")
+        click.echo(
+            f"Policy ARN:  arn:aws:iam::{account_id}:policy/{config.policy_name}"
+        )
         click.echo()
         click.echo("Policy Document:")
         policy_doc = get_s3_access_policy(config.bucket_name)
@@ -940,7 +966,9 @@ def create(
         click.echo(json.dumps(initial_trust, indent=2))
         click.echo()
         click.echo("Final Trust Policy (after external volume creation):")
-        final_trust = get_snowflake_trust_policy("<SNOWFLAKE_IAM_USER_ARN>", config.external_id)
+        final_trust = get_snowflake_trust_policy(
+            "<SNOWFLAKE_IAM_USER_ARN>", config.external_id
+        )
         click.echo(json.dumps(final_trust, indent=2))
         click.echo()
 
@@ -974,7 +1002,9 @@ def create(
     account_id = get_aws_account_id(sts_client)
     policy_arn = f"arn:aws:iam::{account_id}:policy/{config.policy_name}"
     if output == "text":
-        click.echo(f"AWS Account ID: {mask_sensitive_string(account_id, 'aws_account_id')}")
+        click.echo(
+            f"AWS Account ID: {mask_sensitive_string(account_id, 'aws_account_id')}"
+        )
         click.echo()
 
     # Track what we've created for potential rollback
@@ -1016,7 +1046,9 @@ def create(
         click.echo("─" * 40)
         click.echo("Step 2: Create IAM Policy")
         click.echo("─" * 40)
-        policy_arn = create_iam_policy(iam_client, config.policy_name, config.bucket_name)
+        policy_arn = create_iam_policy(
+            iam_client, config.policy_name, config.bucket_name
+        )
         created_policy = True
         click.echo()
 
@@ -1185,7 +1217,9 @@ def delete(
     aws_policy_name = policy_name or to_aws_name(f"{bucket}-snowflake-policy", prefix)
 
     # Generate Snowflake names (uppercase, underscores, SQL-safe)
-    sf_volume_name = volume_name or to_sql_identifier(f"{bucket}_external_volume", prefix)
+    sf_volume_name = volume_name or to_sql_identifier(
+        f"{bucket}_external_volume", prefix
+    )
 
     click.echo("=" * 60)
     click.echo("Snowflake External Volume Manager - Delete")
@@ -1344,12 +1378,16 @@ def update_trust(
     # Determine role and volume names
     if bucket:
         aws_role_name = role_name or to_aws_name(f"{bucket}-snowflake-role", prefix)
-        sf_volume_name = volume_name or to_sql_identifier(f"{bucket}_external_volume", prefix)
+        sf_volume_name = volume_name or to_sql_identifier(
+            f"{bucket}_external_volume", prefix
+        )
     elif role_name and volume_name:
         aws_role_name = role_name
         sf_volume_name = volume_name
     else:
-        raise click.ClickException("Provide either --bucket or both --role-name and --volume-name")
+        raise click.ClickException(
+            "Provide either --bucket or both --role-name and --volume-name"
+        )
 
     click.echo("=" * 60)
     click.echo("Snowflake External Volume Manager - Update Trust Policy")

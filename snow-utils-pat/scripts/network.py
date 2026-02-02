@@ -23,18 +23,15 @@ Provides:
 """
 
 import click
-
-from network_presets import (
+from snow_utils_common import (
     NetworkRuleMode,
     NetworkRuleType,
     collect_ipv4_cidrs,
     get_valid_types_for_mode,
-    validate_mode_type,
-)
-from snow_common import (
     run_snow_sql,
     run_snow_sql_stdin,
     set_snow_cli_options,
+    validate_mode_type,
 )
 
 
@@ -154,7 +151,9 @@ def create_network_rule(
             f"Valid types: {valid}"
         )
 
-    sql = get_network_rule_sql(name, db, schema, values, mode, rule_type, comment, force)
+    sql = get_network_rule_sql(
+        name, db, schema, values, mode, rule_type, comment, force
+    )
 
     if dry_run:
         click.echo(sql)
@@ -324,10 +323,18 @@ def assign_network_policy_to_user(user: str, policy_name: str) -> None:
 
 def unassign_network_policy_from_user(user: str) -> None:
     """Remove network policy from a user (idempotent)."""
-    run_snow_sql_stdin(f"ALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;", check=False)
+    run_snow_sql_stdin(
+        f"ALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;", check=False
+    )
 
 
-MODE_CHOICES = ["ingress", "internal_stage", "egress", "postgres_ingress", "postgres_egress"]
+MODE_CHOICES = [
+    "ingress",
+    "internal_stage",
+    "egress",
+    "postgres_ingress",
+    "postgres_egress",
+]
 TYPE_CHOICES = ["ipv4", "host_port", "private_host_port", "awsvpceid"]
 
 
@@ -364,22 +371,28 @@ def policy() -> None:
 
 
 @rule.command(name="create")
-@click.option("--name", "-n", required=True, envvar="NW_RULE_NAME", help="Network rule name")
+@click.option(
+    "--name", "-n", required=True, envvar="NW_RULE_NAME", help="Network rule name"
+)
 @click.option("--db", required=True, envvar="NW_RULE_DB", help="Database for rule")
 @click.option(
-    "--schema", "-s",
+    "--schema",
+    "-s",
     default="NETWORKS",
     envvar="NW_RULE_SCHEMA",
     help="Schema (default: NETWORKS)",
 )
 @click.option(
-    "--mode", "-m",
+    "--mode",
+    "-m",
     type=click.Choice(MODE_CHOICES, case_sensitive=False),
     default="ingress",
     help="Rule mode (default: ingress)",
 )
 @click.option(
-    "--type", "-t", "rule_type",
+    "--type",
+    "-t",
+    "rule_type",
     type=click.Choice(TYPE_CHOICES, case_sensitive=False),
     default="ipv4",
     help="Value type (default: ipv4)",
@@ -390,16 +403,22 @@ def policy() -> None:
     default=True,
     help="Include local IP (IPV4 only, default: ON)",
 )
-@click.option("--allow-gh", "-G", is_flag=True, help="Include GitHub Actions IPs (IPV4 only)")
-@click.option("--allow-google", "-g", is_flag=True, help="Include Google IPs (IPV4 only)")
+@click.option(
+    "--allow-gh", "-G", is_flag=True, help="Include GitHub Actions IPs (IPV4 only)"
+)
+@click.option(
+    "--allow-google", "-g", is_flag=True, help="Include Google IPs (IPV4 only)"
+)
 @click.option("--dry-run", is_flag=True, help="Preview SQL without executing")
 @click.option(
-    "--force", "-f",
+    "--force",
+    "-f",
     is_flag=True,
     help="Overwrite existing rule/policy (CREATE OR REPLACE)",
 )
 @click.option(
-    "--policy", "-p",
+    "--policy",
+    "-p",
     "policy_name",
     help="Also create/update network policy with this name",
 )
@@ -507,9 +526,13 @@ def rule_create(
 
 
 @rule.command(name="delete")
-@click.option("--name", "-n", required=True, envvar="NW_RULE_NAME", help="Network rule name")
+@click.option(
+    "--name", "-n", required=True, envvar="NW_RULE_NAME", help="Network rule name"
+)
 @click.option("--db", required=True, envvar="NW_RULE_DB", help="Database name")
-@click.option("--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name")
+@click.option(
+    "--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name"
+)
 @click.confirmation_option(prompt="Delete this network rule?")
 def rule_delete_cmd(name: str, db: str, schema: str) -> None:
     """Delete a network rule."""
@@ -521,7 +544,9 @@ def rule_delete_cmd(name: str, db: str, schema: str) -> None:
 
 @rule.command(name="list")
 @click.option("--db", required=True, envvar="NW_RULE_DB", help="Database name")
-@click.option("--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name")
+@click.option(
+    "--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name"
+)
 def rule_list_cmd(db: str, schema: str) -> None:
     """List network rules in schema."""
     click.echo(f"Network rules in {db}.{schema}:".upper())
@@ -541,12 +566,15 @@ def rule_list_cmd(db: str, schema: str) -> None:
 @policy.command(name="create")
 @click.option("--name", "-n", required=True, help="Network policy name")
 @click.option(
-    "--rules", "-r",
+    "--rules",
+    "-r",
     required=True,
     help="Comma-separated fully qualified rule names (db.schema.rule)",
 )
 @click.option("--dry-run", is_flag=True, help="Preview SQL without executing")
-@click.option("--force", "-f", is_flag=True, help="Overwrite existing policy (CREATE OR REPLACE)")
+@click.option(
+    "--force", "-f", is_flag=True, help="Overwrite existing policy (CREATE OR REPLACE)"
+)
 def policy_create_cmd(name: str, rules: str, dry_run: bool, force: bool) -> None:
     """
     Create a network policy with specified rules.
@@ -568,7 +596,8 @@ def policy_create_cmd(name: str, rules: str, dry_run: bool, force: bool) -> None
 @policy.command(name="alter")
 @click.option("--name", "-n", required=True, help="Network policy name")
 @click.option(
-    "--rules", "-r",
+    "--rules",
+    "-r",
     required=True,
     help="Comma-separated fully qualified rule names (db.schema.rule)",
 )

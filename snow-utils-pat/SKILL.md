@@ -10,233 +10,280 @@ Creates service users, network policies, authentication policies, and Programmat
 ## Workflow
 
 **🚫 FORBIDDEN ACTIONS - NEVER DO THESE:**
-- NEVER run SQL queries to discover/find/check SA_ROLE, SNOW_UTILS_DB, or any infrastructure
-- NEVER run `SHOW ROLES`, `SHOW DATABASES`, or similar to populate empty .env values
-- NEVER auto-populate empty values by querying Snowflake
-- If .env values are empty, they stay empty until the user provides them via interactive prompt
 
-### Step 1: Check Environment
+- NEVER run SQL queries to discover/find/check values (no SHOW ROLES, SHOW DATABASES, SHOW USERS)
+- NEVER auto-populate empty .env values by querying Snowflake
+- NEVER use flags that bypass user interaction: `--yes`, `-y`, `--auto-setup`, `--auto-approve`, `--quiet`, `--force`, `--non-interactive`
+- NEVER assume user consent - always ask and wait for explicit confirmation
+- NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
+- If .env values are empty, prompt user or run check_setup.py
 
-**Actions:**
+**✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
-1. **Verify** project has required files:
+**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
+
+### Step 0: Check Prerequisites
+
+**Check required tools are installed:**
+
+```bash
+command -v uv >/dev/null 2>&1 && echo "uv: OK" || echo "uv: MISSING"
+command -v snow >/dev/null 2>&1 && echo "snow: OK" || echo "snow: MISSING"
+```
+
+**If any tool is MISSING, stop and provide installation instructions:**
+
+| Tool | Install Command |
+|------|-----------------|
+| `uv` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| `snow` | `pip install snowflake-cli` or `uv tool install snowflake-cli` |
+
+**⚠️ STOP**: Do not proceed until all prerequisites are installed.
+
+### Step 1: Load and Merge Environment
+
+1. **Check if .env exists:**
+
    ```bash
    ls -la .env 2>/dev/null || echo "missing"
    ```
 
-2. **If .env missing**, copy EXACTLY from `.env.example`:
+2. **If .env missing**, copy from .env.example:
+
    ```bash
    cp <SKILL_DIR>/.env.example .env
    ```
-   
-   **If .env exists**, MERGE new settings - do NOT overwrite:
+
+   **If .env exists**, merge missing keys from .env.example:
    - Read existing .env
-   - Add only missing keys from `.env.example`
-   - Preserve user's existing values
+   - Add only keys that don't exist (preserve all existing values)
+   - Keys to check: SNOWFLAKE_DEFAULT_CONNECTION_NAME, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_ACCOUNT_URL, SA_ROLE, SNOW_UTILS_DB, SA_USER, SA_ADMIN_ROLE, LOCAL_IP, SA_PAT
 
-3. **Verify** Snowflake connection:
+3. **Check connection details in .env:**
+
    ```bash
-   snow connection list
+   grep -E "^SNOWFLAKE_(DEFAULT_CONNECTION_NAME|ACCOUNT|USER|ACCOUNT_URL)=" .env
    ```
-   - If user needs to choose a connection, ask them to select one
-   - Set ONLY `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<selected_connection>` in .env
 
-**⚠️ CRITICAL RULES FOR STEP 1:**
-- Do NOT run any SQL queries (no SHOW ROLES, SHOW DATABASES, etc.)
-- Do NOT try to discover or infer SA_ROLE or SNOW_UTILS_DB values
-- Do NOT set these values - leave them empty in .env
-- The ONLY value to set is SNOWFLAKE_DEFAULT_CONNECTION_NAME
-- Proceed to Step 2 - the script will prompt user for values
+**If SNOWFLAKE_DEFAULT_CONNECTION_NAME is empty:**
 
-**⚠️ STOP**: After setting connection, proceed DIRECTLY to Step 2. Do not run any additional commands.
+- List connections:
 
-### Step 2: Check Infrastructure (REQUIRED)
+     ```bash
+     snow connection list
+     ```
 
-**Run pre-flight check with NO FLAGS** (script will prompt interactively):
+- Ask user to select a connection
+- Test connection and extract details:
+
+     ```bash
+     snow connection test -c <selected_connection> --format json
+     ```
+
+- Update .env with:
+  - `SNOWFLAKE_DEFAULT_CONNECTION_NAME=<selected>`
+  - `SNOWFLAKE_ACCOUNT=<account from output>`
+  - `SNOWFLAKE_USER=<user from output>`
+  - `SNOWFLAKE_ACCOUNT_URL=https://<host from output>`
+
+**If connection details already present:** Skip to Step 2.
+
+### Step 2: Check Infrastructure (Conditional)
+
+Read SA_ROLE and SNOW_UTILS_DB from .env:
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+grep -E "^(SA_ROLE|SNOW_UTILS_DB)=" .env
 ```
 
-**⚠️ CRITICAL: Run the command EXACTLY as shown above.**
-- Do NOT add any flags
-- Do NOT source .env before running
-- Let the script prompt the user interactively
+**If BOTH have values:** Skip to Step 3.
+
+**If either is empty**, run check_setup.py:
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+```
 
 The script will:
-1. Prompt for SA Role name (default: SNOW_UTILS_SA)
-2. Prompt for Database name (default: SNOW_UTILS)
-3. Check if infrastructure exists
-4. Offer to create it if missing (requires ACCOUNTADMIN)
 
-**After setup completes, update `.env`** with the values user provided:
-- `SA_ROLE=<user_role>`
-- `SNOW_UTILS_DB=<user_db>`
+1. Read SNOWFLAKE_USER from environment for context
+2. Prompt for SA Role name (suggests {USER}_SNOW_UTILS_SA)
+3. Prompt for Database name (suggests {USER}_SNOW_UTILS)
+4. Check if they exist, offer to create if missing
 
-**If user declines setup**, explain they need to run setup first:
-- `snow sql -f snow-utils-setup.sql --templating all --role ACCOUNTADMIN`
+**After script completes, update .env:**
 
-**If exit code is 0**: Continue to Step 3.
+- `SA_ROLE=<value user confirmed>`
+- `SNOW_UTILS_DB=<value user confirmed>`
 
-### Step 3: Gather Requirements
+### Step 3: Gather Requirements (with Semantic Prompts)
 
-**Ask user:**
+Read existing values from .env for semantic suggestions:
+
+```bash
+grep -E "^(SNOWFLAKE_USER|SA_ROLE|SNOW_UTILS_DB)=" .env
 ```
-To create the PAT:
-1. Service user name:
-2. PAT role (the role this service account can use):
-3. Admin role (default: ${SA_ROLE} - the role with privileges to create policies):
-4. Database for policy objects (default: ${SNOW_UTILS_DB}):
-5. PAT expiry days (default: 30):
+
+**Prompt for skill-specific values with semantic defaults:**
+
+| Variable | Semantic Match | Prompt |
+|----------|---------------|--------|
+| SA_USER | SNOWFLAKE_USER | "Service user name [default: {SNOWFLAKE_USER}_service]:" |
+| SA_ADMIN_ROLE | SA_ROLE | "Admin role for policies [default: use {SA_ROLE}?]:" |
+
+**Full prompt:**
+
+```
+PAT Configuration:
+
+1. Service user name [default: <SNOWFLAKE_USER>_service]:
+2. PAT role (role the service account can use):
+3. Admin role for creating policies:
+   → Found SA_ROLE=<value> - use same? [Y/n]:
+4. Database for policy objects:
+   → Found SNOW_UTILS_DB=<value> - use same? [Y/n]:
+5. PAT expiry days [default: 30]:
 ```
 
 **⚠️ STOP**: Wait for user input.
 
-**After user provides input, update `.env` with their values:**
+**After user provides input, update .env:**
 
-Update these variables in `.env`:
-- `SA_USER=<user_service_user_name>`
-- `SA_ROLE=<user_admin_role>` (if different from default)
-- `SNOW_UTILS_DB=<user_database>` (if different from default)
-
-This ensures values are saved for future runs (e.g., rotate, remove commands).
+- `SA_USER=<confirmed_value>`
+- `SA_ADMIN_ROLE=<confirmed_value>` (may equal SA_ROLE)
 
 ### Step 4: Preview (Dry Run)
 
 **Execute:**
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-  create --user <USER> --role <PAT_ROLE> --db <DB> --dry-run
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  create --user <SA_USER> --role <PAT_ROLE> --db <SNOW_UTILS_DB> --dry-run
 ```
 
-**CRITICAL: You MUST show ALL SQL from the dry-run output. Do NOT skip or summarize.**
+**🔴 CRITICAL: SHOW BOTH SUMMARY AND FULL SQL**
 
-**Section 1: Resources Summary**
-List what would be created with actual names from output.
+After running dry-run, display output in TWO parts:
 
-**Section 2: ALL SQL Statements (REQUIRED - DO NOT SKIP)**
-Copy the COMPLETE SQL from output under "SQL that would be executed:" and display as:
+**Part 1 - Resource Summary (brief):**
+
+```
+User:     MY_SERVICE_USER
+Role:     MY_ROLE
+Database: MY_DB
+PAT Name: MY_SERVICE_USER_PAT
+```
+
+**Part 2 - Full SQL (MANDATORY - do not skip on first display):**
 
 ```sql
 -- Step 1: Create service user
 USE ROLE accountadmin;
-CREATE USER IF NOT EXISTS ...
-... (copy ALL SQL from output)
+CREATE USER IF NOT EXISTS MY_SERVICE_USER
+    TYPE = SERVICE
+    COMMENT = 'Service user for PAT access';
+GRANT ROLE MY_ROLE TO USER MY_SERVICE_USER;
 
 -- Step 2: Create network rule and policy
-USE ROLE ...;
-CREATE DATABASE IF NOT EXISTS ...;
-CREATE OR REPLACE NETWORK RULE ...;
-CREATE OR REPLACE NETWORK POLICY ...;
-... (copy ALL SQL)
+CREATE NETWORK RULE MY_DB.NETWORKS.MY_SERVICE_USER_NETWORK_RULE
+    MODE = INGRESS
+    TYPE = IPV4
+    VALUE_LIST = ('192.168.1.1/32')
+    COMMENT = 'Created by snow-utils';
 
 -- Step 3: Create authentication policy
-CREATE OR ALTER AUTHENTICATION POLICY ...;
-... (copy ALL SQL)
+CREATE SCHEMA IF NOT EXISTS MY_DB.POLICIES;
+CREATE OR ALTER AUTHENTICATION POLICY MY_DB.POLICIES.MY_SERVICE_USER_AUTH_POLICY
+    AUTHENTICATION_METHODS = ('PROGRAMMATIC_ACCESS_TOKEN')
+    PAT_POLICY = (
+        default_expiry_in_days = 45,
+        max_expiry_in_days = 90,
+        network_policy_evaluation = ENFORCED_REQUIRED
+    );
+
+ALTER USER MY_SERVICE_USER SET AUTHENTICATION POLICY MY_DB.POLICIES.MY_SERVICE_USER_AUTH_POLICY;
 
 -- Step 4: Create PAT
-ALTER USER IF EXISTS ... ADD PAT ...;
+ALTER USER IF EXISTS MY_SERVICE_USER ADD PAT MY_SERVICE_USER_PAT ROLE_RESTRICTION = MY_ROLE;
 ```
 
-**FAILURE TO SHOW COMPLETE SQL IS A SKILL VIOLATION.** Users cannot approve without reviewing all statements.
+**FORBIDDEN:** Showing only summary without SQL. User MUST see BOTH parts on first display.
 
-**⚠️ STOP**: Get approval before creating resources.
+**⚠️ STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 
 ### Step 5: Create Resources
 
 **Execute:**
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-  create --user <USER> --role <PAT_ROLE> --db <DB> --output json
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  create --user <SA_USER> --role <PAT_ROLE> --db <SNOW_UTILS_DB> --output json
 ```
 
-**On success**: 
-- Token is written to .env file
+**On success:**
+
+- Token is written to .env as SA_PAT
 - Show connection verification result
 
-**On failure**: Present error and remediation steps.
+**On failure:** Present error and remediation steps.
 
 ### Step 6: Verify Connection
 
 If `--skip-verify` was not used, connection is already verified.
 
 Otherwise:
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  -c "${SNOWFLAKE_DEFAULT_CONNECTION_NAME}" \
-  verify --user <USER>
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  verify --user <SA_USER>
 ```
 
 ## Tools
 
 ### check_setup.py
 
-**Description**: Pre-flight check for snow-utils infrastructure. Prompts interactively for values.
+**Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
 
 **Usage:**
+
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
 ```
 
-**⚠️ DO NOT ADD ANY FLAGS. The script will prompt interactively.**
+**⚠️ DO NOT ADD ANY FLAGS.**
 
 **Options:**
-- `--quiet`, `-q`: Exit 0 if ready, 1 if not (no output, for scripting only)
 
-Uses the active Snowflake connection from SNOWFLAKE_DEFAULT_CONNECTION_NAME.
-
-**Exit codes:**
-- 0: Infrastructure ready
-- 1: Infrastructure missing (setup declined or failed)
-- 2: Error during check
+- `--quiet`, `-q`: Exit 0 if ready, 1 if not (scripting only)
 
 ### pat.py
 
-**Description**: Creates and manages Snowflake PATs with network and auth policies.
-
-**Global Options:**
-- `--connection`, `-c`: Snowflake connection name [env: SNOWFLAKE_DEFAULT_CONNECTION_NAME]
+**Description:** Creates and manages Snowflake PATs with network and auth policies.
 
 **Commands:**
+
 - `create`: Create service user, policies, and PAT
 - `remove`: Remove all PAT-related resources
 - `rotate`: Rotate existing PAT
 - `verify`: Test PAT connection
 
-**Create Usage:**
-```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  [-c CONNECTION] create --user USER --role ROLE --db DATABASE \
-  [--admin-role ADMIN_ROLE] [--dry-run] [--output json]
-```
+**Create Options:**
 
-**Key Options:**
 - `--user`: Service user name (required)
 - `--role`: PAT role restriction (required)
 - `--admin-role`: Role for creating policies (default: same as --role)
 - `--db`: Database for policy objects (required)
-- `--pat-name`: Custom PAT name (default: {USER}_PAT)
-- `--rotate`: Replace existing PAT
 - `--dry-run`: Preview without creating
 - `--output json`: Machine-readable output
 - `--local-ip`: Override auto-detected IP
 - `--default-expiry-days`: Token expiry (default: 30)
-- `--skip-verify`: Skip connection verification
-
-**Remove Usage:**
-```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  [-c CONNECTION] remove --user USER --db DATABASE
-```
 
 ## Stopping Points
 
-- ✋ Step 1: If environment checks fail
-- ✋ Step 2: Interactive prompts for SA_ROLE/SNOW_UTILS_DB, then setup if needed
-- ✋ Step 3: After gathering requirements  
+- ✋ Step 1: If connection checks fail
+- ✋ Step 2: If infra check needed (prompts user)
+- ✋ Step 3: After gathering requirements
 - ✋ Step 4: After dry-run preview (get approval)
-- ✋ Step 5: If creation fails
 
 ## Output
 
@@ -244,25 +291,22 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 - Network rule with local IP
 - Network policy (ENFORCED_REQUIRED)
 - Authentication policy (PROGRAMMATIC_ACCESS_TOKEN only)
-- PAT token (saved to .env)
-- Verified connection
+- PAT token (saved to .env as SA_PAT)
+- Updated .env with all values
 
 ## Troubleshooting
 
-**Infrastructure not set up**: Run `check_setup.py` interactively or with `--auto-setup`.
+**Infrastructure not set up:** Run check_setup.py - it will prompt and offer to create.
 
-**Network policy blocking**: Ensure your IP is in the network rule. Run with `--local-ip` to specify.
+**Network policy blocking:** Ensure your IP is in the network rule. Use --local-ip to specify.
 
-**Permission denied**: SA_ROLE needs CREATE NETWORK RULE, CREATE NETWORK POLICY, CREATE AUTHENTICATION POLICY privileges.
+**PAT already exists:** Use --rotate to replace existing PAT.
 
-**PAT already exists**: Use `--rotate` to replace existing PAT.
-
-**Connection verification failed**: Check network policy allows your IP and auth policy is correctly assigned.
+**Connection verification failed:** Check network policy allows your IP.
 
 ## Security Notes
 
-- PAT tokens are stored in .env with proper escaping
+- PAT tokens stored in .env with proper escaping
 - Network policy restricts access to specified IPs only
-- Auth policy enforces PAT-only authentication (no password)
-- Tokens have configurable expiry (default 30 days, max 365)
-- SA_ROLE has scoped privileges with no grant delegation
+- Auth policy enforces PAT-only authentication
+- Tokens have configurable expiry (default 30 days)
