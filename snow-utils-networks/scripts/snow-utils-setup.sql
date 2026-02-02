@@ -18,25 +18,25 @@
 -- =============================================================================
 -- Snow-Utils Setup Script
 -- =============================================================================
--- Creates the SA role and database with SCOPED privileges (secure-first).
+-- Creates the SA role and database. SA_ADMIN_ROLE owns all objects.
 --
 -- Environment Variables (from .env):
---   SA_ROLE        - Name of the service account role to create
---   SNOW_UTILS_DB  - Name of the database to create
+--   SA_ROLE        - Role for service account (PAT role restriction)
+--   SNOW_UTILS_DB  - Database for snow-utils objects
 --   SNOWFLAKE_USER - Current user (will be granted SA_ROLE)
---   SA_ADMIN_ROLE  - Admin role to run setup (e.g., ACCOUNTADMIN)
+--   SA_ADMIN_ROLE  - Admin role that owns DB and runs setup (e.g., ACCOUNTADMIN)
 --
 -- Security Model:
---   SA_ROLE gets ONLY database-scoped privileges:
---     - CREATE NETWORK RULE (in SNOW_UTILS_DB.NETWORKS)
+--   SA_ADMIN_ROLE owns database and schemas, handles all operations:
 --     - Database/schema ownership
---
---   Account-level operations use SA_ADMIN_ROLE:
 --     - CREATE USER (service accounts)
---     - CREATE NETWORK POLICY
+--     - CREATE NETWORK RULE/POLICY
 --     - CREATE AUTHENTICATION POLICY
 --     - CREATE EXTERNAL VOLUME
 --     - ALTER USER (policy assignments)
+--
+--   SA_ROLE is for PAT role restriction only (what the service account can do).
+--   Grant SA_ROLE additional privileges as needed for specific use cases.
 --
 -- Prerequisites:
 --   - Must be run by SA_ADMIN_ROLE (default: ACCOUNTADMIN)
@@ -48,49 +48,26 @@
 USE ROLE <% ctx.env.SA_ADMIN_ROLE %>;
 
 -- =============================================================================
--- Step 1: Create SA Role (scoped privileges only)
+-- Step 1: Create SA Role (for PAT role restriction)
 -- =============================================================================
 
 CREATE ROLE IF NOT EXISTS <% ctx.env.SA_ROLE %>
-    COMMENT = 'Role for snow-utils DB operations (scoped privileges only)';
+    COMMENT = 'Role for service account PAT restriction';
 
 -- =============================================================================
--- Step 2: Create Database and Schemas
+-- Step 2: Create Database and Schemas (owned by SA_ADMIN_ROLE)
 -- =============================================================================
 
 CREATE DATABASE IF NOT EXISTS <% ctx.env.SNOW_UTILS_DB %>
-    COMMENT = 'Database for snow-utils objects (network rules, etc.)';
+    COMMENT = 'Database for snow-utils objects (network rules, policies, etc.)';
 
 CREATE SCHEMA IF NOT EXISTS <% ctx.env.SNOW_UTILS_DB %>.NETWORKS
     COMMENT = 'Schema for network rules';
 CREATE SCHEMA IF NOT EXISTS <% ctx.env.SNOW_UTILS_DB %>.POLICIES
-    COMMENT = 'Schema for authentication policies (created by SA_ADMIN_ROLE)';
+    COMMENT = 'Schema for authentication policies';
 
 -- =============================================================================
--- Step 3: Grant Database and Schema Ownership to SA Role
--- =============================================================================
-
-GRANT OWNERSHIP ON DATABASE <% ctx.env.SNOW_UTILS_DB %> TO ROLE <% ctx.env.SA_ROLE %> COPY CURRENT GRANTS;
-GRANT OWNERSHIP ON SCHEMA <% ctx.env.SNOW_UTILS_DB %>.NETWORKS TO ROLE <% ctx.env.SA_ROLE %> COPY CURRENT GRANTS;
-GRANT OWNERSHIP ON SCHEMA <% ctx.env.SNOW_UTILS_DB %>.POLICIES TO ROLE <% ctx.env.SA_ROLE %> COPY CURRENT GRANTS;
-
--- =============================================================================
--- Step 4: Schema-Level Privileges for Network Rules
--- =============================================================================
--- Network RULES are database objects (scoped to SA_ROLE).
--- Network POLICIES are account objects (use SA_ADMIN_ROLE).
-
-GRANT CREATE NETWORK RULE ON SCHEMA <% ctx.env.SNOW_UTILS_DB %>.NETWORKS TO ROLE <% ctx.env.SA_ROLE %>;
-GRANT USAGE ON SCHEMA <% ctx.env.SNOW_UTILS_DB %>.NETWORKS TO ROLE <% ctx.env.SA_ROLE %>;
-
--- =============================================================================
--- Step 5: Future Grants for New Objects
--- =============================================================================
-
-GRANT ALL PRIVILEGES ON FUTURE NETWORK RULES IN SCHEMA <% ctx.env.SNOW_UTILS_DB %>.NETWORKS TO ROLE <% ctx.env.SA_ROLE %>;
-
--- =============================================================================
--- Step 6: Grant SA Role to Current User and SYSADMIN
+-- Step 3: Grant SA Role to Current User and SYSADMIN
 -- =============================================================================
 
 GRANT ROLE <% ctx.env.SA_ROLE %> TO USER <% ctx.env.SNOWFLAKE_USER %>;
@@ -102,4 +79,4 @@ GRANT ROLE <% ctx.env.SA_ROLE %> TO ROLE SYSADMIN;
 -- SHOW GRANTS TO ROLE <% ctx.env.SA_ROLE %>;
 -- SHOW GRANTS ON DATABASE <% ctx.env.SNOW_UTILS_DB %>;
 
-SELECT 'Snow-utils setup complete. Role <% ctx.env.SA_ROLE %> granted to <% ctx.env.SNOWFLAKE_USER %>.' AS status;
+SELECT 'Snow-utils setup complete. SA_ADMIN_ROLE <% ctx.env.SA_ADMIN_ROLE %> owns <% ctx.env.SNOW_UTILS_DB %>. SA_ROLE <% ctx.env.SA_ROLE %> granted to <% ctx.env.SNOWFLAKE_USER %>.' AS status;

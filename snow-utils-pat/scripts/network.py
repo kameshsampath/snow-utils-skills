@@ -48,17 +48,6 @@ def get_admin_role() -> str:
     return admin_role.upper()
 
 
-def get_sa_role() -> str:
-    """Get the SA role from environment. Required - no fallback."""
-    sa_role = os.environ.get("SA_ROLE", "").strip()
-    if not sa_role:
-        raise click.ClickException(
-            "SA_ROLE is required but not set in environment.\n"
-            "Set it in .env (e.g., SA_ROLE=MY_SNOW_UTILS_SA)"
-        )
-    return sa_role.upper()
-
-
 def get_network_rule_sql(
     name: str,
     db: str,
@@ -87,8 +76,8 @@ def get_network_rule_sql(
     value_list = ", ".join(f"'{v}'" for v in values)
     comment_text = comment or "Created by snow-utils"
     create_stmt = "CREATE OR REPLACE" if force else "CREATE"
-    sa_role = get_sa_role()
-    return f"""USE ROLE {sa_role};
+    admin_role = get_admin_role()
+    return f"""USE ROLE {admin_role};
 {create_stmt} NETWORK RULE {db}.{schema}.{name}
     MODE = {mode.value}
     TYPE = {rule_type.value}
@@ -188,7 +177,9 @@ def create_network_rule(
     if dry_run:
         click.echo(sql)
     else:
+        admin_role = get_admin_role()
         setup_sql = (
+            f"USE ROLE {admin_role};\n"
             f"CREATE DATABASE IF NOT EXISTS {db};\n"
             f"CREATE SCHEMA IF NOT EXISTS {db}.{schema};\n"
         )
@@ -243,10 +234,10 @@ def alter_network_policy(
 
 
 def delete_network_rule(name: str, db: str, schema: str) -> None:
-    """Delete a network rule (idempotent). Uses SA_ROLE."""
-    sa_role = get_sa_role()
+    """Delete a network rule (idempotent). Uses SA_ADMIN_ROLE."""
+    admin_role = get_admin_role()
     run_snow_sql(
-        f"USE ROLE {sa_role}; DROP NETWORK RULE IF EXISTS {db}.{schema}.{name}"
+        f"USE ROLE {admin_role}; DROP NETWORK RULE IF EXISTS {db}.{schema}.{name}"
     )
 
 

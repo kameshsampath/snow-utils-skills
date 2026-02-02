@@ -106,7 +106,7 @@ def get_auth_policy_sql(
 ) -> str:
     """Generate SQL for creating authentication policy (idempotent).
 
-    Uses SA_ADMIN_ROLE for CREATE AUTHENTICATION POLICY (account-level privilege).
+    Uses SA_ADMIN_ROLE for all operations (owns DB and has account-level privileges).
     """
     admin_role = get_admin_role()
     auth_policy_name = f"{user}_auth_policy".upper()
