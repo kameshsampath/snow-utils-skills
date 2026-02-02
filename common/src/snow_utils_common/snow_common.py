@@ -36,11 +36,13 @@ class SnowCLIOptions:
     debug: bool = False
     mask_sensitive: bool = True
     connection: str | None = None
+    force_user_connection: bool = False
 
     def get_flags(self) -> list[str]:
         """Get CLI flags based on options.
 
-        If SA_PAT is set, uses temporary connection mode with SA credentials.
+        If SA_PAT is set and force_user_connection is False, uses temporary
+        connection mode with SA credentials.
         Otherwise, uses named connection from SNOWFLAKE_DEFAULT_CONNECTION_NAME.
 
         Note: PAT token is passed via SNOWFLAKE_PASSWORD env var (see get_env()),
@@ -48,7 +50,7 @@ class SnowCLIOptions:
         """
         flags = []
         sa_pat = os.environ.get("SA_PAT")
-        if sa_pat:
+        if sa_pat and not self.force_user_connection:
             sa_user = os.environ.get("SA_USER")
             account = os.environ.get("SNOWFLAKE_ACCOUNT")
             sa_role = os.environ.get("SA_ROLE")
@@ -91,17 +93,20 @@ class SnowCLIOptions:
     def get_env(self) -> dict[str, str]:
         """Get environment variables for subprocess.
 
-        If SA_PAT is set, includes SNOWFLAKE_PASSWORD with the token.
+        If SA_PAT is set and force_user_connection is False, includes
+        SNOWFLAKE_PASSWORD with the token.
         This keeps the token out of the command line (security).
         """
         env = dict(os.environ)
         sa_pat = os.environ.get("SA_PAT")
-        if sa_pat and self.uses_sa_credentials():
+        if sa_pat and self.uses_sa_credentials() and not self.force_user_connection:
             env["SNOWFLAKE_PASSWORD"] = sa_pat
         return env
 
     def uses_sa_credentials(self) -> bool:
         """Check if SA credentials will be used."""
+        if self.force_user_connection:
+            return False
         sa_pat = os.environ.get("SA_PAT")
         sa_user = os.environ.get("SA_USER")
         account = os.environ.get("SNOWFLAKE_ACCOUNT")
@@ -109,6 +114,15 @@ class SnowCLIOptions:
 
 
 _snow_cli_options = SnowCLIOptions()
+
+
+def set_force_user_connection(force: bool) -> None:
+    """Set whether to force using user's connection (bypass SA credentials).
+
+    Use this during PAT creation when SA_PAT doesn't exist yet but may
+    be present as a stale value in .env.
+    """
+    _snow_cli_options.force_user_connection = force
 
 
 def mask_aws_account_id(value: str) -> str:

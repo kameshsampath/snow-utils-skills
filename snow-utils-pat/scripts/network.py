@@ -22,6 +22,8 @@ Provides:
 - IPv4 preset support (GitHub Actions, Google, local IP)
 """
 
+import os
+
 import click
 from snow_utils_common import (
     NetworkRuleMode,
@@ -33,6 +35,28 @@ from snow_utils_common import (
     set_snow_cli_options,
     validate_mode_type,
 )
+
+
+def get_admin_role() -> str:
+    """Get the admin role from environment. Required - no fallback."""
+    admin_role = os.environ.get("SA_ADMIN_ROLE", "").strip()
+    if not admin_role:
+        raise click.ClickException(
+            "SA_ADMIN_ROLE is required but not set in environment.\n"
+            "Set it in .env (e.g., SA_ADMIN_ROLE=ACCOUNTADMIN)"
+        )
+    return admin_role.upper()
+
+
+def get_sa_role() -> str:
+    """Get the SA role from environment. Required - no fallback."""
+    sa_role = os.environ.get("SA_ROLE", "").strip()
+    if not sa_role:
+        raise click.ClickException(
+            "SA_ROLE is required but not set in environment.\n"
+            "Set it in .env (e.g., SA_ROLE=MY_SNOW_UTILS_SA)"
+        )
+    return sa_role.upper()
 
 
 def get_network_rule_sql(
@@ -63,7 +87,9 @@ def get_network_rule_sql(
     value_list = ", ".join(f"'{v}'" for v in values)
     comment_text = comment or "Created by snow-utils"
     create_stmt = "CREATE OR REPLACE" if force else "CREATE"
-    return f"""{create_stmt} NETWORK RULE {db}.{schema}.{name}
+    sa_role = get_sa_role()
+    return f"""USE ROLE {sa_role};
+{create_stmt} NETWORK RULE {db}.{schema}.{name}
     MODE = {mode.value}
     TYPE = {rule_type.value}
     VALUE_LIST = ({value_list})
@@ -90,7 +116,9 @@ def get_network_policy_sql(
     rule_list = ", ".join(rule_refs)
     comment_text = comment or "Created by snow-utils"
     create_stmt = "CREATE OR REPLACE" if force else "CREATE"
-    return f"""{create_stmt} NETWORK POLICY {policy_name}
+    admin_role = get_admin_role()
+    return f"""USE ROLE {admin_role};
+{create_stmt} NETWORK POLICY {policy_name}
     ALLOWED_NETWORK_RULE_LIST = ({rule_list})
     COMMENT = '{comment_text}';"""
 
@@ -110,7 +138,9 @@ def get_alter_network_policy_sql(
         ALTER NETWORK POLICY SQL statement
     """
     rule_list = ", ".join(rule_refs)
-    return f"""ALTER NETWORK POLICY {policy_name}
+    admin_role = get_admin_role()
+    return f"""USE ROLE {admin_role};
+ALTER NETWORK POLICY {policy_name}
     ADD ALLOWED_NETWORK_RULE_LIST = ({rule_list});"""
 
 
@@ -213,13 +243,17 @@ def alter_network_policy(
 
 
 def delete_network_rule(name: str, db: str, schema: str) -> None:
-    """Delete a network rule (idempotent)."""
-    run_snow_sql(f"DROP NETWORK RULE IF EXISTS {db}.{schema}.{name}")
+    """Delete a network rule (idempotent). Uses SA_ROLE."""
+    sa_role = get_sa_role()
+    run_snow_sql(
+        f"USE ROLE {sa_role}; DROP NETWORK RULE IF EXISTS {db}.{schema}.{name}"
+    )
 
 
 def delete_network_policy(policy_name: str) -> None:
-    """Delete a network policy (idempotent)."""
-    run_snow_sql(f"DROP NETWORK POLICY IF EXISTS {policy_name}")
+    """Delete a network policy (idempotent). Uses SA_ADMIN_ROLE."""
+    admin_role = get_admin_role()
+    run_snow_sql(f"USE ROLE {admin_role}; DROP NETWORK POLICY IF EXISTS {policy_name}")
 
 
 def list_network_rules(db: str, schema: str) -> list[dict]:
@@ -307,8 +341,9 @@ def cleanup_network_for_user(
     policy_name = f"{user}_NETWORK_POLICY".upper()
 
     if unset_from_user:
+        admin_role = get_admin_role()
         run_snow_sql_stdin(
-            f"ALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;",
+            f"USE ROLE {admin_role};\nALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;",
             check=False,
         )
 
@@ -317,14 +352,25 @@ def cleanup_network_for_user(
 
 
 def assign_network_policy_to_user(user: str, policy_name: str) -> None:
-    """Assign a network policy to a user."""
-    run_snow_sql_stdin(f"ALTER USER {user} SET NETWORK_POLICY = '{policy_name}';")
+    """Assign a network policy to a user.
+
+    Uses SA_ADMIN_ROLE for ALTER USER (account-level privilege).
+    """
+    admin_role = get_admin_role()
+    run_snow_sql_stdin(
+        f"USE ROLE {admin_role};\nALTER USER {user} SET NETWORK_POLICY = '{policy_name}';"
+    )
 
 
 def unassign_network_policy_from_user(user: str) -> None:
-    """Remove network policy from a user (idempotent)."""
+    """Remove network policy from a user (idempotent).
+
+    Uses SA_ADMIN_ROLE for ALTER USER (account-level privilege).
+    """
+    admin_role = get_admin_role()
     run_snow_sql_stdin(
-        f"ALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;", check=False
+        f"USE ROLE {admin_role};\nALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;",
+        check=False,
     )
 
 

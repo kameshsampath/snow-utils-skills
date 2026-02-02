@@ -38,6 +38,7 @@ from snow_utils_common import (
     get_snow_cli_options,
     run_snow_sql,
     run_snow_sql_stdin,
+    set_force_user_connection,
     set_masking,
     set_snow_cli_options,
 )
@@ -68,9 +69,24 @@ def get_snowflake_account() -> str:
     return account
 
 
+def get_admin_role() -> str:
+    """Get the admin role from environment. Required - no fallback."""
+    admin_role = os.environ.get("SA_ADMIN_ROLE", "").strip()
+    if not admin_role:
+        raise click.ClickException(
+            "SA_ADMIN_ROLE is required but not set in environment.\n"
+            "Set it in .env (e.g., SA_ADMIN_ROLE=ACCOUNTADMIN)"
+        )
+    return admin_role.upper()
+
+
 def get_service_user_sql(user: str, pat_role: str) -> str:
-    """Generate SQL for creating service user (idempotent)."""
-    return f"""USE ROLE accountadmin;
+    """Generate SQL for creating service user (idempotent).
+
+    Uses SA_ADMIN_ROLE for CREATE USER (account-level privilege).
+    """
+    admin_role = get_admin_role()
+    return f"""USE ROLE {admin_role};
 CREATE USER IF NOT EXISTS {user}
     TYPE = SERVICE
     COMMENT = 'Service user for PAT access';
@@ -88,10 +104,15 @@ def setup_service_user(user: str, pat_role: str) -> None:
 def get_auth_policy_sql(
     user: str, db: str, default_expiry_days: int, max_expiry_days: int
 ) -> str:
-    """Generate SQL for creating authentication policy (idempotent)."""
+    """Generate SQL for creating authentication policy (idempotent).
+
+    Uses SA_ADMIN_ROLE for CREATE AUTHENTICATION POLICY (account-level privilege).
+    """
+    admin_role = get_admin_role()
     auth_policy_name = f"{user}_auth_policy".upper()
 
-    return f"""CREATE SCHEMA IF NOT EXISTS {db}.POLICIES;
+    return f"""USE ROLE {admin_role};
+CREATE SCHEMA IF NOT EXISTS {db}.POLICIES;
 CREATE OR ALTER AUTHENTICATION POLICY {db}.POLICIES.{auth_policy_name}
     AUTHENTICATION_METHODS = ('PROGRAMMATIC_ACCESS_TOKEN')
     PAT_POLICY = (
@@ -119,8 +140,9 @@ def remove_auth_policy(user: str, db: str) -> None:
 
     click.echo(f"Removing authentication policy: {db}.POLICIES.{auth_policy_name}")
 
+    admin_role = get_admin_role()
     sql = f"""
-        USE ROLE accountadmin;
+        USE ROLE {admin_role};
         ALTER USER IF EXISTS {user} UNSET AUTHENTICATION POLICY;
         DROP AUTHENTICATION POLICY IF EXISTS {db}.POLICIES.{auth_policy_name};
     """
@@ -198,9 +220,10 @@ def remove_pat(user: str, pat_name: str) -> None:
 def remove_service_user(user: str) -> None:
     """Drop the service user (idempotent)."""
     click.echo(f"Dropping service user: {user}")
+    admin_role = get_admin_role()
 
     sql = f"""
-        USE ROLE accountadmin;
+        USE ROLE {admin_role};
         DROP USER IF EXISTS {user};
     """
     run_snow_sql_stdin(sql)
@@ -328,6 +351,7 @@ def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
         create  - Create/rotate PAT for service user
         remove  - Remove PAT and associated objects
     """
+    set_force_user_connection(True)
     set_snow_cli_options(verbose=verbose, debug=debug)
 
     if ctx.invoked_subcommand is None:
@@ -430,8 +454,15 @@ def create_command(
         # Multiple IP sources
         pat.py create --user my_sa --role demo_role --db my_db --allow-gh --allow-google
     """
+    # Uppercase all Snowflake identifiers for DB standards
+    user = user.upper()
+    role = role.upper()
+    db = db.upper()
+
     if not pat_name:
-        pat_name = f"{user}_pat".upper()
+        pat_name = f"{user}_PAT"
+    else:
+        pat_name = pat_name.upper()
 
     cidrs = collect_ipv4_cidrs(
         allow_local=allow_local,
@@ -579,13 +610,19 @@ def remove_command(
     4. Drop service user (if --drop-user)
     5. Clear .env credentials
     """
+    # Uppercase all Snowflake identifiers for DB standards
+    user = user.upper()
+    db = db.upper()
+
     click.echo("=" * 50)
     click.echo("Snowflake PAT Manager - Remove")
     click.echo("=" * 50)
     click.echo()
 
     if not pat_name:
-        pat_name = f"{user}_pat".upper()
+        pat_name = f"{user}_PAT"
+    else:
+        pat_name = pat_name.upper()
 
     click.echo(f"User:     {user}")
     click.echo(f"Database: {db}")

@@ -22,9 +22,20 @@ Creates service users, network policies, authentication policies, and Programmat
 
 **⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
 
-### Step 0: Check Prerequisites
+### Step 0: Check Prerequisites (with Memory Caching)
 
-**Check required tools are installed:**
+**First, check memory for cached prereqs:**
+
+```
+Check memory at /memories/snow-utils-prereqs.md for:
+- tools_checked: true → skip tool check
+- infra_ready: true → skip infra check in Step 2
+- sa_role, snow_utils_db → use cached values
+```
+
+**If `tools_checked: true` in memory:** Skip to Step 1.
+
+**Otherwise, check required tools:**
 
 ```bash
 command -v uv >/dev/null 2>&1 && echo "uv: OK" || echo "uv: MISSING"
@@ -39,6 +50,13 @@ command -v snow >/dev/null 2>&1 && echo "snow: OK" || echo "snow: MISSING"
 | `snow` | `pip install snowflake-cli` or `uv tool install snowflake-cli` |
 
 **⚠️ STOP**: Do not proceed until all prerequisites are installed.
+
+**After tools verified, update memory:**
+
+```
+Create/update /memories/snow-utils-prereqs.md:
+tools_checked: true
+```
 
 ### Step 1: Load and Merge Environment
 
@@ -90,7 +108,14 @@ command -v snow >/dev/null 2>&1 && echo "snow: OK" || echo "snow: MISSING"
 
 ### Step 2: Check Infrastructure (Conditional)
 
-Read SA_ROLE and SNOW_UTILS_DB from .env:
+**First, check memory for cached infra status:**
+
+If memory has `infra_ready: true` with `sa_role` and `snow_utils_db` values:
+
+- Use cached values
+- Skip infra check, go to Step 3
+
+**Otherwise, read from .env:**
 
 ```bash
 grep -E "^(SA_ROLE|SNOW_UTILS_DB)=" .env
@@ -98,23 +123,44 @@ grep -E "^(SA_ROLE|SNOW_UTILS_DB)=" .env
 
 **If BOTH have values:** Skip to Step 3.
 
-**If either is empty**, run check_setup.py:
+**If either is empty**, run check_setup.py with JSON output:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --output json
 ```
 
-The script will:
+Parse the JSON response to determine status:
 
-1. Read SNOWFLAKE_USER from environment for context
-2. Prompt for SA Role name (suggests {USER}_SNOW_UTILS_SA)
-3. Prompt for Database name (suggests {USER}_SNOW_UTILS)
-4. Check if they exist, offer to create if missing
+- `ready: true` → Infrastructure exists, skip to Step 3
+- `ready: false` → Need to create infrastructure
 
-**After script completes, update .env:**
+**If not ready**, use `ask_user_question` to confirm:
+
+- Show suggested values from JSON (`defaults.role`, `defaults.database`)
+- Ask user to confirm or provide custom values
+
+**If user confirms setup**, run:
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --role <ROLE> --db <DB> --user <USER> --admin-role <SA_ADMIN_ROLE> --setup
+```
+
+**After setup completes, update .env:**
 
 - `SA_ROLE=<value user confirmed>`
 - `SNOW_UTILS_DB=<value user confirmed>`
+- `SA_ADMIN_ROLE=<value user confirmed>`
+
+**Update memory:**
+
+```
+Update /memories/snow-utils-prereqs.md:
+tools_checked: true
+infra_ready: true
+sa_role: <VALUE>
+snow_utils_db: <VALUE>
+sa_admin_role: <VALUE>
+```
 
 ### Step 3: Gather Requirements (with Semantic Prompts)
 
@@ -129,7 +175,7 @@ grep -E "^(SNOWFLAKE_USER|SA_ROLE|SNOW_UTILS_DB)=" .env
 | Variable | Semantic Match | Prompt |
 |----------|---------------|--------|
 | SA_USER | SNOWFLAKE_USER | "Service user name [default: {SNOWFLAKE_USER}_service]:" |
-| SA_ADMIN_ROLE | SA_ROLE | "Admin role for policies [default: use {SA_ROLE}?]:" |
+| SA_ADMIN_ROLE | - | "Admin role for setup/policies [default: ACCOUNTADMIN]:" |
 
 **Full prompt:**
 
@@ -138,8 +184,7 @@ PAT Configuration:
 
 1. Service user name [default: <SNOWFLAKE_USER>_service]:
 2. PAT role (role the service account can use):
-3. Admin role for creating policies:
-   → Found SA_ROLE=<value> - use same? [Y/n]:
+3. Admin role for setup and policies [default: ACCOUNTADMIN]:
 4. Database for policy objects:
    → Found SNOW_UTILS_DB=<value> - use same? [Y/n]:
 5. PAT expiry days [default: 30]:

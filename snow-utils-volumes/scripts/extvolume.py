@@ -509,14 +509,18 @@ def delete_iam_role(iam_client: Any, role_name: str, policy_arn: str) -> None:
 def get_external_volume_sql(
     config: ExternalVolumeConfig, role_arn: str, force: bool = False
 ) -> str:
-    """Generate SQL for creating external volume."""
+    """Generate SQL for creating external volume.
+
+    Uses ACCOUNTADMIN for CREATE EXTERNAL VOLUME (account-level privilege).
+    """
     allow_writes = "TRUE" if config.allow_writes else "FALSE"
     create_stmt = (
         "CREATE OR REPLACE EXTERNAL VOLUME"
         if force
         else "CREATE EXTERNAL VOLUME IF NOT EXISTS"
     )
-    return f"""{create_stmt} {config.volume_name}
+    return f"""USE ROLE ACCOUNTADMIN;
+{create_stmt} {config.volume_name}
     STORAGE_LOCATIONS = (
         (
             NAME = '{config.storage_location_name}'
@@ -594,10 +598,10 @@ def describe_external_volume(volume_name: str) -> dict[str, str]:
 
 
 def drop_external_volume(volume_name: str) -> None:
-    """Drop Snowflake external volume."""
+    """Drop Snowflake external volume. Uses ACCOUNTADMIN."""
     click.echo(f"Dropping Snowflake external volume: {volume_name}")
 
-    run_snow_sql(f"DROP EXTERNAL VOLUME IF EXISTS {volume_name}")
+    run_snow_sql(f"USE ROLE ACCOUNTADMIN; DROP EXTERNAL VOLUME IF EXISTS {volume_name}")
     click.echo(f"✓ Dropped external volume: {volume_name}")
 
 

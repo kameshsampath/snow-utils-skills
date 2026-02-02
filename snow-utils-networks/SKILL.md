@@ -24,9 +24,20 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 **⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
 
-### Step 0: Check Prerequisites
+### Step 0: Check Prerequisites (with Memory Caching)
 
-**Check required tools are installed:**
+**First, check memory for cached prereqs:**
+
+```
+Check memory at /memories/snow-utils-prereqs.md for:
+- tools_checked: true → skip tool check
+- infra_ready: true → skip infra check in Step 2
+- sa_role, snow_utils_db → use cached values
+```
+
+**If `tools_checked: true` in memory:** Skip to Step 1.
+
+**Otherwise, check required tools:**
 
 ```bash
 command -v uv >/dev/null 2>&1 && echo "uv: OK" || echo "uv: MISSING"
@@ -41,6 +52,13 @@ command -v snow >/dev/null 2>&1 && echo "snow: OK" || echo "snow: MISSING"
 | `snow` | `pip install snowflake-cli` or `uv tool install snowflake-cli` |
 
 **⚠️ STOP**: Do not proceed until all prerequisites are installed.
+
+**After tools verified, update memory:**
+
+```
+Create/update /memories/snow-utils-prereqs.md:
+tools_checked: true
+```
 
 ### Step 1: Load and Merge Environment
 
@@ -92,7 +110,14 @@ command -v snow >/dev/null 2>&1 && echo "snow: OK" || echo "snow: MISSING"
 
 ### Step 2: Check Infrastructure (Conditional)
 
-Read SA_ROLE, SA_USER, SNOW_UTILS_DB, and SA_PAT from .env:
+**First, check memory for cached infra status:**
+
+If memory has `infra_ready: true` with `sa_role` and `snow_utils_db` values:
+
+- Use cached values
+- Skip infra check, go to Step 3
+
+**Otherwise, read from .env:**
 
 ```bash
 grep -E "^(SA_ROLE|SA_USER|SNOW_UTILS_DB|SA_PAT)=" .env
@@ -121,7 +146,20 @@ This ensures the network rules are created using the service account credentials
 
 **Do NOT proceed** until SA_PAT is populated in .env.
 
-**If ALL values present (SA_ROLE, SA_USER, SNOW_UTILS_DB, SA_PAT):** Continue to Step 3.
+**If ALL values present (SA_ROLE, SA_USER, SNOW_UTILS_DB, SA_PAT):**
+
+**Update memory:**
+
+```
+Update /memories/snow-utils-prereqs.md:
+tools_checked: true
+infra_ready: true
+sa_role: <SA_ROLE>
+snow_utils_db: <SNOW_UTILS_DB>
+sa_admin_role: <SA_ADMIN_ROLE>
+```
+
+Continue to Step 3.
 
 ### Step 3: Gather Requirements (with Semantic Prompts)
 
