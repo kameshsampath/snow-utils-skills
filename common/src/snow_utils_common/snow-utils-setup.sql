@@ -18,28 +18,29 @@
 -- =============================================================================
 -- Snow-Utils Setup Script
 -- =============================================================================
--- Creates the SA role and database. SA_ADMIN_ROLE owns all objects.
+-- Creates shared infrastructure database and default SA role.
 --
 -- Environment Variables (from .env):
---   SA_ROLE        - Role for service account (PAT role restriction)
---   SNOW_UTILS_DB  - Database for snow-utils objects
+--   SA_ROLE        - Role for PAT restriction (demo-scoped, set per-demo)
+--   SNOW_UTILS_DB  - Shared infra database for account-level objects
 --   SNOWFLAKE_USER - Current user (will be granted SA_ROLE)
---   SA_ADMIN_ROLE  - Admin role that owns DB and runs setup (e.g., ACCOUNTADMIN)
+--   SA_ADMIN_ROLE  - Admin role that owns infra DB (e.g., ACCOUNTADMIN)
 --
--- Security Model:
---   SA_ADMIN_ROLE owns database and schemas, handles all operations:
---     - Database/schema ownership
---     - CREATE USER (service accounts)
---     - CREATE NETWORK RULE/POLICY
---     - CREATE AUTHENTICATION POLICY
---     - CREATE EXTERNAL VOLUME
+-- Architecture:
+--   SNOW_UTILS_DB is shared infrastructure:
+--     - NETWORKS schema: network rules for any demo
+--     - POLICIES schema: auth policies for any demo
+--     - Owned by SA_ADMIN_ROLE, used by all demos
+--
+--   SA_ADMIN_ROLE handles all privileged operations:
+--     - Owns SNOW_UTILS_DB and schemas
+--     - CREATE USER, NETWORK RULE/POLICY, AUTH POLICY, EXTERNAL VOLUME
 --     - ALTER USER (policy assignments)
 --
---   SA_ROLE is for PAT role restriction only (what the service account can do).
---   Grant SA_ROLE additional privileges as needed for specific use cases.
---
--- Prerequisites:
---   - Must be run by SA_ADMIN_ROLE (default: ACCOUNTADMIN)
+--   SA_ROLE is demo-scoped (set per-demo in .env):
+--     - Restricts what PAT service accounts can access
+--     - Demo setup grants SA_ROLE only demo-specific resources
+--     - Example: SA_ROLE=HIRC_DUCKDB_DEMO_SA (access to demo tables only)
 --
 -- Usage:
 --   snow sql -f snow-utils-setup.sql --enable-templating ALL --role <SA_ADMIN_ROLE>
