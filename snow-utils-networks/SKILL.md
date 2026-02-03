@@ -318,12 +318,32 @@ Values:    3 CIDRs
 **Part 2 - Full SQL (MANDATORY - do not skip on first display):**
 
 ```sql
-CREATE NETWORK RULE MY_DB.NETWORKS.MY_RULE
+-- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
+USE ROLE <SA_ADMIN_ROLE>;
+CREATE NETWORK RULE MY_DB.NETWORKS.MYAPP_RUNNER_NETWORK_RULE
     MODE = INGRESS
     TYPE = IPV4
     VALUE_LIST = ('192.168.1.1/32', '10.0.0.0/8', '172.16.0.0/12')
-    COMMENT = 'Created by snow-utils';
+    COMMENT = 'MYAPP network rule - managed by snow-utils-networks';
+
+CREATE NETWORK POLICY MYAPP_RUNNER_NETWORK_POLICY
+    ALLOWED_NETWORK_RULE_LIST = ('MY_DB.NETWORKS.MYAPP_RUNNER_NETWORK_RULE')
+    COMMENT = 'MYAPP network policy - managed by snow-utils-networks';
 ```
+
+**COMMENT Pattern:** `{CONTEXT} {resource_type} - managed by snow-utils-networks`
+
+**Context Inference:**
+
+- Derived from NW_RULE_NAME by stripping suffixes: `_NETWORK_RULE`, `_RULE`, `_RUNNER`
+- Example: `MYAPP_RUNNER_NETWORK_RULE` → `MYAPP`
+- Can be overridden via root CLI option: `network.py --comment "MY_PROJECT" rule create ...`
+
+This enables:
+
+- Easy identification of resources by project context
+- Filtering resources by skill: `SHOW NETWORK RULES WHERE COMMENT LIKE '%snow-utils-networks%'`
+- Cleanup discovery across multiple projects
 
 **FORBIDDEN:** Showing only summary without SQL. User MUST see BOTH parts on first display.
 
