@@ -334,6 +334,22 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 **On failure:** Present error and remediation steps.
 
+### Step 5.5: Secure .env File
+
+**Set restrictive permissions on .env to protect the PAT token:**
+
+```bash
+chmod 600 .env
+```
+
+**Verify permissions:**
+
+```bash
+ls -la .env | grep -E "^-rw-------"
+```
+
+This ensures only the file owner can read/write the .env file containing the sensitive PAT.
+
 ### Step 6: Verify Connection (MANDATORY)
 
 **Always verify the PAT works after creation:**
