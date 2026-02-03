@@ -334,16 +334,25 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 **On failure:** Present error and remediation steps.
 
-### Step 6: Verify Connection
+### Step 6: Verify Connection (MANDATORY)
 
-If `--skip-verify` was not used, connection is already verified.
-
-Otherwise:
+**Always verify the PAT works after creation:**
 
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  verify --user <SA_USER>
+  verify --user <SA_USER> --role <SA_ROLE>
 ```
+
+**Verification uses:**
+
+- `snow sql -x` with `SNOWFLAKE_PASSWORD` set to the PAT token
+- Runs `SELECT current_timestamp()` to confirm authentication works
+
+**If verification fails:**
+
+- Check network policy allows current IP
+- Verify auth policy is attached to user
+- Run with `--debug` flag for detailed output
 
 ### Step 7: Write Success Summary and Cleanup Manifest
 
