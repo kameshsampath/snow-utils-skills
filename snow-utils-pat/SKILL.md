@@ -398,79 +398,180 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 ### Step 7: Write Success Summary and Cleanup Manifest
 
-**After successful creation, append to `snow-utils-manifest.md` in project directory.**
+**Manifest Location:** `.snow-utils/snow-utils-manifest.md`
 
-If file doesn't exist, create with header:
+**Create directory if needed:**
+
+```bash
+mkdir -p .snow-utils
+```
+
+**If manifest doesn't exist, create with header:**
 
 ```markdown
 # Snow-Utils Manifest
 
-This manifest tracks resources created by snow-utils skills.
-Each section can be cleaned up independently.
+This manifest tracks Snowflake resources created by snow-utils skills.
+Each skill section is bounded by START/END markers for easy identification.
+CoCo can use this manifest to replay creation or cleanup resources.
+
+---
 ```
 
-**Append skill section:**
+#### Progressive Manifest Writing
+
+**Update manifest AFTER EACH resource is successfully created (not at the end).**
+
+This enables recovery if CoCo loses context mid-creation.
+
+**After Step 1 (Network Rule created):**
 
 ```markdown
-## snow-utils-pat
-Created: <TIMESTAMP>
+<!-- START -- snow-utils-pat -->
+## PAT Resources: {COMMENT_PREFIX}
 
-| Type | Name | Location |
-|------|------|----------|
-| User | HIRC_DUCKDB_DEMO_RUNNER | Account |
-| Role | HIRC_DUCKDB_DEMO_ACCESS | Account |
-| Network Rule | HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE | KAMESHS_SNOW_UTILS.NETWORKS |
-| Network Policy | HIRC_DUCKDB_DEMO_RUNNER_NETWORK_POLICY | Account |
-| Auth Policy | HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY | KAMESHS_SNOW_UTILS.POLICIES |
-| PAT | HIRC_DUCKDB_DEMO_RUNNER_PAT | User: HIRC_DUCKDB_DEMO_RUNNER |
+**Created:** {TIMESTAMP}
+**User:** {SA_USER}
+**Role:** {SA_ROLE}
+**Status:** IN_PROGRESS
 
-### Cleanup (execute in order)
+### Resources (creation order)
+
+| # | Type | Name | Location | Status |
+|---|------|------|----------|--------|
+| 1 | Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS | ✓ |
+| 2 | Network Policy | {SA_USER}_NETWORK_POLICY | Account | pending |
+| 3 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | pending |
+| 4 | Service User | {SA_USER} | Account | pending |
+| 5 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | pending |
+<!-- END -- snow-utils-pat -->
+```
+
+**After each subsequent resource, update status from `pending` to `✓`.**
+
+**After all resources created, update Status to COMPLETE and add cleanup section:**
+
+```markdown
+<!-- START -- snow-utils-pat -->
+## PAT Resources: {COMMENT_PREFIX}
+
+**Created:** {TIMESTAMP}
+**User:** {SA_USER}
+**Role:** {SA_ROLE}
+**Status:** COMPLETE
+
+### Resources (creation order)
+
+| # | Type | Name | Location | Status |
+|---|------|------|----------|--------|
+| 1 | Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS | ✓ |
+| 2 | Network Policy | {SA_USER}_NETWORK_POLICY | Account | ✓ |
+| 3 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | ✓ |
+| 4 | Service User | {SA_USER} | Account | ✓ |
+| 5 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | ✓ |
+
+### Cleanup Instructions (dependency order - reverse of creation)
 
 ```sql
--- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
-USE ROLE <SA_ADMIN_ROLE>;
--- 1. Remove PAT
-ALTER USER HIRC_DUCKDB_DEMO_RUNNER REMOVE PAT HIRC_DUCKDB_DEMO_RUNNER_PAT;
--- 2. Unset auth policy (MUST do before drop)
-ALTER USER HIRC_DUCKDB_DEMO_RUNNER UNSET AUTHENTICATION POLICY;
--- 3. Drop auth policy
-DROP AUTHENTICATION POLICY IF EXISTS KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY;
--- 4. Unset network policy
-ALTER USER HIRC_DUCKDB_DEMO_RUNNER UNSET NETWORK POLICY;
--- 5. Drop network policy
-DROP NETWORK POLICY IF EXISTS HIRC_DUCKDB_DEMO_RUNNER_NETWORK_POLICY;
--- 6. Drop network rule
-DROP NETWORK RULE IF EXISTS KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE;
--- 7. Drop user
-DROP USER IF EXISTS HIRC_DUCKDB_DEMO_RUNNER;
--- 8. Drop role (optional)
--- DROP ROLE IF EXISTS HIRC_DUCKDB_DEMO_ACCESS;
+USE ROLE {SA_ADMIN_ROLE};
+-- 1. Remove PAT first (depends on user)
+ALTER USER {SA_USER} REMOVE PAT {SA_USER}_PAT;
+-- 2. Unassign auth policy (MUST do before drop)
+ALTER USER {SA_USER} UNSET AUTHENTICATION POLICY;
+-- 3. Unassign network policy
+ALTER USER {SA_USER} UNSET NETWORK POLICY;
+-- 4. Drop user (now safe - no policy dependencies)
+DROP USER IF EXISTS {SA_USER};
+-- 5. Drop auth policy
+DROP AUTHENTICATION POLICY IF EXISTS {SNOW_UTILS_DB}.POLICIES.{SA_USER}_AUTH_POLICY;
+-- 6. Drop network policy
+DROP NETWORK POLICY IF EXISTS {SA_USER}_NETWORK_POLICY;
+-- 7. Drop network rule (last - policy depended on it)
+DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 ```
 
-### One-liner
+### CLI Cleanup
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user <SA_USER> --db <SNOW_UTILS_DB>
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user {SA_USER} --db {SNOW_UTILS_DB}
+```
+<!-- END -- snow-utils-pat -->
 ```
 
+#### Remove Flow (Reads Manifest First)
+
+**On `remove` command:**
+
+1. **Check manifest exists:** `.snow-utils/snow-utils-manifest.md`
+2. **If exists:** Read `<!-- START -- snow-utils-pat -->` section for exact resource names
+3. **Use manifest values** for cleanup instead of inferring from naming convention
+4. **After cleanup success:** Remove the `<!-- START -- snow-utils-pat -->` to `<!-- END -- snow-utils-pat -->` section
+5. **If manifest becomes empty** (only header): Optionally delete the file
+
+#### Replay Flow (Single Confirmation)
+
+**If user asks to replay/recreate from manifest:**
+
+1. **Read manifest** `.snow-utils/snow-utils-manifest.md`
+2. **Find section** `<!-- START -- snow-utils-pat -->`
+3. **Display info summary with single confirmation:**
+
 ```
+ℹ️  Replay from manifest will create:
+
+  1. Network Rule:   {SA_USER}_NETWORK_RULE
+  2. Network Policy: {SA_USER}_NETWORK_POLICY  
+  3. Auth Policy:    {SA_USER}_AUTH_POLICY
+  4. Service User:   {SA_USER}
+  5. PAT:            {SA_USER}_PAT
+
+Using values from manifest:
+  User: {SA_USER}
+  Role: {SA_ROLE}
+  Database: {SNOW_UTILS_DB}
+
+Proceed with creation? [yes/no]
+```
+
+4. **On "yes":** Execute all creation steps without individual confirmations
+5. **Update manifest** progressively as each resource is created
+
+#### Resume Flow (Partial Creation Recovery)
+
+**If manifest shows Status: IN_PROGRESS:**
+
+1. **Read which resources have status `✓`** (already created)
+2. **Display resume info:**
+
+```
+ℹ️  Resuming from partial creation:
+
+  ✓ Network Rule:   CREATED
+  ✓ Network Policy: CREATED
+  - Auth Policy:    PENDING
+  - Service User:   PENDING
+  - PAT:            PENDING
+
+Continue from Auth Policy creation? [yes/no]
+```
+
+3. **On "yes":** Continue from first `pending` resource
+4. **Update manifest** as each remaining resource is created
 
 **Display success summary to user:**
 
 ```
-
 PAT Setup Complete!
 
 Resources Created:
-  User:           HIRC_DUCKDB_DEMO_RUNNER
-  Role:           HIRC_DUCKDB_DEMO_ACCESS
-  Network Rule:   KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE
-  Network Policy: HIRC_DUCKDB_DEMO_RUNNER_NETWORK_POLICY
-  Auth Policy:    KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY
-  PAT:            ***REDACTED*** (saved to .env as SA_PAT)
+  User:           {SA_USER}
+  Role:           {SA_ROLE}
+  Network Rule:   {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE
+  Network Policy: {SA_USER}_NETWORK_POLICY
+  Auth Policy:    {SNOW_UTILS_DB}.POLICIES.{SA_USER}_AUTH_POLICY
+  PAT:            ***REDACTED*** (saved to .env as SNOWFLAKE_PASSWORD)
 
-Manifest appended to: ./snow-utils-manifest.md
-
+Manifest updated: .snow-utils/snow-utils-manifest.md
 ```
 
 ## PAT Security
@@ -546,9 +647,11 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 
 | Command | After Success |
 |---------|---------------|
-| `create` | Update .env (SA_PAT) → Run `verify` → Add section to `.snow-utils/snow-utils-manifest.md` |
+| `create` | Update manifest progressively → Update .env (SA_PAT) → Run `verify` → Mark manifest COMPLETE |
 | `rotate` | Update .env (SA_PAT with new token) → Run `verify` |
-| `remove` | Clear SA_PAT from .env → Remove `snow-utils-pat` section from `.snow-utils/snow-utils-manifest.md` |
+| `remove` | Read manifest first for exact names → Clear SA_PAT from .env → Remove skill section from manifest |
+| `replay` | Read manifest → Single info confirmation → Execute all steps → Update manifest progressively |
+| `resume` | Read manifest (IN_PROGRESS) → Show completed/pending → Continue from first pending |
 
 **Commands:**
 
