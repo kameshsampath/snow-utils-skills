@@ -25,7 +25,6 @@ from .snow_common import (
     mask_sensitive_string,
     run_snow_sql,
     run_snow_sql_stdin,
-    set_force_user_connection,
     set_masking,
     set_snow_cli_options,
 )
@@ -48,7 +47,6 @@ __all__ = [
     "mask_sensitive_string",
     "run_snow_sql",
     "run_snow_sql_stdin",
-    "set_force_user_connection",
     "set_masking",
     "set_snow_cli_options",
     "validate_mode_type",

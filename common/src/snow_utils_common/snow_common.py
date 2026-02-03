@@ -20,7 +20,6 @@ Shared functionality for snow CLI wrapper functions and options.
 """
 
 import json
-import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -35,94 +34,18 @@ class SnowCLIOptions:
     verbose: bool = False
     debug: bool = False
     mask_sensitive: bool = True
-    connection: str | None = None
-    force_user_connection: bool = False
 
     def get_flags(self) -> list[str]:
-        """Get CLI flags based on options.
-
-        If SA_PAT is set and force_user_connection is False, uses temporary
-        connection mode with SA credentials.
-        Otherwise, uses named connection from SNOWFLAKE_DEFAULT_CONNECTION_NAME.
-
-        Note: PAT token is passed via SNOWFLAKE_PASSWORD env var (see get_env()),
-        not on command line, to avoid exposing secrets in process list.
-        """
+        """Get CLI flags based on options."""
         flags = []
-        sa_pat = os.environ.get("SA_PAT")
-        if sa_pat and not self.force_user_connection:
-            sa_user = os.environ.get("SA_USER")
-            account = os.environ.get("SNOWFLAKE_ACCOUNT")
-            sa_role = os.environ.get("SA_ROLE")
-            if sa_user and account:
-                flags.extend(
-                    [
-                        "--temporary-connection",
-                        "--account",
-                        account,
-                        "--user",
-                        sa_user,
-                        "--authenticator",
-                        "PROGRAMMATIC_ACCESS_TOKEN",
-                    ]
-                )
-                if sa_role:
-                    flags.extend(["--role", sa_role])
-            else:
-                click.echo(
-                    "Warning: SA_PAT set but SA_USER or SNOWFLAKE_ACCOUNT missing",
-                    err=True,
-                )
-                conn = self.connection or os.environ.get(
-                    "SNOWFLAKE_DEFAULT_CONNECTION_NAME"
-                )
-                if conn:
-                    flags.extend(["-c", conn])
-        else:
-            conn = self.connection or os.environ.get(
-                "SNOWFLAKE_DEFAULT_CONNECTION_NAME"
-            )
-            if conn:
-                flags.extend(["-c", conn])
         if self.debug:
             flags.append("--debug")
         elif self.verbose:
             flags.append("--verbose")
         return flags
 
-    def get_env(self) -> dict[str, str]:
-        """Get environment variables for subprocess.
-
-        If SA_PAT is set and force_user_connection is False, includes
-        SNOWFLAKE_PASSWORD with the token.
-        This keeps the token out of the command line (security).
-        """
-        env = dict(os.environ)
-        sa_pat = os.environ.get("SA_PAT")
-        if sa_pat and self.uses_sa_credentials() and not self.force_user_connection:
-            env["SNOWFLAKE_PASSWORD"] = sa_pat
-        return env
-
-    def uses_sa_credentials(self) -> bool:
-        """Check if SA credentials will be used."""
-        if self.force_user_connection:
-            return False
-        sa_pat = os.environ.get("SA_PAT")
-        sa_user = os.environ.get("SA_USER")
-        account = os.environ.get("SNOWFLAKE_ACCOUNT")
-        return bool(sa_pat and sa_user and account)
-
 
 _snow_cli_options = SnowCLIOptions()
-
-
-def set_force_user_connection(force: bool) -> None:
-    """Set whether to force using user's connection (bypass SA credentials).
-
-    Use this during PAT creation when SA_PAT doesn't exist yet but may
-    be present as a stale value in .env.
-    """
-    _snow_cli_options.force_user_connection = force
 
 
 def mask_aws_account_id(value: str) -> str:
@@ -181,9 +104,7 @@ def mask_sensitive_string(value: str, mask_type: str = "auto") -> str:
     return value
 
 
-def mask_json_sensitive(
-    data: dict | list, sensitive_keys: list[str] | None = None
-) -> dict | list:
+def mask_json_sensitive(data: dict | list, sensitive_keys: list[str] | None = None) -> dict | list:
     """Recursively mask sensitive values in JSON data."""
     if not _snow_cli_options.mask_sensitive:
         return data
@@ -230,19 +151,11 @@ def is_masking_enabled() -> bool:
 
 
 def set_snow_cli_options(
-    verbose: bool = False,
-    debug: bool = False,
-    mask_sensitive: bool = True,
-    connection: str | None = None,
+    verbose: bool = False, debug: bool = False, mask_sensitive: bool = True
 ) -> None:
     """Set global snow CLI options."""
     global _snow_cli_options
-    _snow_cli_options = SnowCLIOptions(
-        verbose=verbose,
-        debug=debug,
-        mask_sensitive=mask_sensitive,
-        connection=connection,
-    )
+    _snow_cli_options = SnowCLIOptions(verbose=verbose, debug=debug, mask_sensitive=mask_sensitive)
 
 
 def get_snow_cli_options() -> SnowCLIOptions:
@@ -250,26 +163,14 @@ def get_snow_cli_options() -> SnowCLIOptions:
     return _snow_cli_options
 
 
-def run_snow_sql(
-    query: str, *, format: str = "json", check: bool = True
-) -> dict | list | None:
+def run_snow_sql(query: str, *, format: str = "json", check: bool = True) -> dict | list | None:
     """Execute a snow sql command and return parsed JSON output."""
-    cmd = [
-        "snow",
-        "sql",
-        *_snow_cli_options.get_flags(),
-        "--query",
-        query,
-        "--format",
-        format,
-    ]
+    cmd = ["snow", "sql", *_snow_cli_options.get_flags(), "--query", query, "--format", format]
 
     if _snow_cli_options.debug:
         click.echo(f"[DEBUG] Running: {' '.join(cmd)}")
 
-    result = subprocess.run(
-        cmd, capture_output=True, text=True, env=_snow_cli_options.get_env()
-    )
+    result = subprocess.run(cmd, capture_output=True, text=True)
 
     if _snow_cli_options.debug and result.stderr:
         click.echo(f"[DEBUG] stderr: {result.stderr}")
@@ -293,9 +194,7 @@ def run_snow_sql_stdin(sql: str, *, check: bool = True) -> subprocess.CompletedP
         click.echo(f"[DEBUG] Running: {' '.join(cmd)}")
         click.echo(f"[DEBUG] SQL:\n{sql}")
 
-    result = subprocess.run(
-        cmd, input=sql, capture_output=True, text=True, env=_snow_cli_options.get_env()
-    )
+    result = subprocess.run(cmd, input=sql, capture_output=True, text=True)
 
     if _snow_cli_options.debug and result.stderr:
         click.echo(f"[DEBUG] stderr: {result.stderr}")

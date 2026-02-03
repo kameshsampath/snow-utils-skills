@@ -30,7 +30,6 @@ from snow_utils_common import (
     get_valid_types_for_mode,
     run_snow_sql,
     run_snow_sql_stdin,
-    set_force_user_connection,
     set_snow_cli_options,
     validate_mode_type,
 )
@@ -148,20 +147,16 @@ def create_network_rule(
     if not validate_mode_type(mode, rule_type):
         valid = get_valid_types_for_mode(mode)
         raise click.ClickException(
-            f"Invalid type '{rule_type.value}' for mode '{mode.value}'. "
-            f"Valid types: {valid}"
+            f"Invalid type '{rule_type.value}' for mode '{mode.value}'. Valid types: {valid}"
         )
 
-    sql = get_network_rule_sql(
-        name, db, schema, values, mode, rule_type, comment, force
-    )
+    sql = get_network_rule_sql(name, db, schema, values, mode, rule_type, comment, force)
 
     if dry_run:
         click.echo(sql)
     else:
         setup_sql = (
-            f"CREATE DATABASE IF NOT EXISTS {db};\n"
-            f"CREATE SCHEMA IF NOT EXISTS {db}.{schema};\n"
+            f"CREATE DATABASE IF NOT EXISTS {db};\nCREATE SCHEMA IF NOT EXISTS {db}.{schema};\n"
         )
         run_snow_sql_stdin(setup_sql + sql)
 
@@ -213,6 +208,93 @@ def alter_network_policy(
         run_snow_sql_stdin(sql)
 
 
+def get_update_network_rule_sql(
+    name: str,
+    db: str,
+    schema: str,
+    values: list[str],
+) -> str:
+    """
+    Generate SQL for updating (replacing) values in an existing network rule.
+
+    Uses CREATE OR REPLACE to atomically update the rule with new values.
+
+    Args:
+        name: Network rule name
+        db: Database name
+        schema: Schema name
+        values: New list of values (CIDRs, hosts, VPC IDs)
+
+    Returns:
+        ALTER NETWORK RULE SQL statement
+    """
+    value_list = ", ".join(f"'{v}'" for v in values)
+    return f"ALTER NETWORK RULE {db}.{schema}.{name} SET VALUE_LIST = ({value_list});"
+
+
+def update_network_rule(
+    name: str,
+    db: str,
+    schema: str,
+    values: list[str],
+    dry_run: bool = False,
+) -> str:
+    """
+    Update an existing network rule with new values.
+
+    Args:
+        name: Network rule name
+        db: Database name
+        schema: Schema name
+        values: New list of values
+        dry_run: If True, only print SQL without executing
+
+    Returns:
+        Fully qualified network rule name (db.schema.name)
+    """
+    sql = get_update_network_rule_sql(name, db, schema, values)
+
+    if dry_run:
+        click.echo(sql)
+    else:
+        run_snow_sql_stdin(sql)
+
+    return f"{db}.{schema}.{name}"
+
+
+def update_network_for_user(
+    user: str,
+    db: str,
+    cidrs: list[str],
+    schema: str = "NETWORKS",
+    dry_run: bool = False,
+) -> str:
+    """
+    Update the network rule CIDRs for an existing user.
+
+    This is a convenience function for updating a user's network access
+    (e.g., when IP changes or adding new IPs).
+
+    Args:
+        user: Username (used to derive rule name: {user}_NETWORK_RULE)
+        db: Database containing the network rule
+        cidrs: New list of IPv4 CIDRs
+        schema: Schema containing the rule (default: NETWORKS)
+        dry_run: If True, only print SQL
+
+    Returns:
+        Fully qualified network rule name
+    """
+    rule_name = f"{user}_NETWORK_RULE".upper()
+    return update_network_rule(
+        name=rule_name,
+        db=db.upper(),
+        schema=schema.upper(),
+        values=cidrs,
+        dry_run=dry_run,
+    )
+
+
 def delete_network_rule(name: str, db: str, schema: str) -> None:
     """Delete a network rule (idempotent)."""
     run_snow_sql(f"DROP NETWORK RULE IF EXISTS {db}.{schema}.{name}")
@@ -237,6 +319,53 @@ def network_policy_exists(policy_name: str) -> bool:
     """Check if a network policy exists."""
     policies = list_network_policies()
     return any(p.get("name", "").upper() == policy_name.upper() for p in policies)
+
+
+def get_setup_network_for_user_sql(
+    user: str,
+    db: str,
+    cidrs: list[str],
+    schema: str = "NETWORKS",
+    force: bool = False,
+) -> str:
+    """
+    Generate SQL for creating network rule and policy for a user.
+
+    This returns the complete SQL without executing it, useful for dry-run display.
+
+    Args:
+        user: Username (used for naming rule/policy)
+        db: Database for network rule
+        cidrs: List of IPv4 CIDRs
+        schema: Schema for network rule (default: NETWORKS)
+        force: If True, use CREATE OR REPLACE
+
+    Returns:
+        Complete SQL string for rule and policy creation
+    """
+    rule_name = f"{user}_NETWORK_RULE".upper()
+    policy_name = f"{user}_NETWORK_POLICY".upper()
+    rule_fqn = f"{db.upper()}.{schema.upper()}.{rule_name}"
+
+    rule_sql = get_network_rule_sql(
+        name=rule_name,
+        db=db.upper(),
+        schema=schema.upper(),
+        values=cidrs,
+        mode=NetworkRuleMode.INGRESS,
+        rule_type=NetworkRuleType.IPV4,
+        comment=f"Network rule for {user} access",
+        force=force,
+    )
+
+    policy_sql = get_network_policy_sql(
+        policy_name=policy_name,
+        rule_refs=[rule_fqn],
+        comment=f"Network policy for {user} access",
+        force=force,
+    )
+
+    return f"{rule_sql}\n\n{policy_sql}"
 
 
 def setup_network_for_user(
@@ -324,18 +453,10 @@ def assign_network_policy_to_user(user: str, policy_name: str) -> None:
 
 def unassign_network_policy_from_user(user: str) -> None:
     """Remove network policy from a user (idempotent)."""
-    run_snow_sql_stdin(
-        f"ALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;", check=False
-    )
+    run_snow_sql_stdin(f"ALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;", check=False)
 
 
-MODE_CHOICES = [
-    "ingress",
-    "internal_stage",
-    "egress",
-    "postgres_ingress",
-    "postgres_egress",
-]
+MODE_CHOICES = ["ingress", "internal_stage", "egress", "postgres_ingress", "postgres_egress"]
 TYPE_CHOICES = ["ipv4", "host_port", "private_host_port", "awsvpceid"]
 
 
@@ -355,8 +476,6 @@ def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
       rule    - Manage network rules (create, list, delete)
       policy  - Manage network policies (create, list, delete)
     """
-    # Force user connection - network creation needs ACCOUNTADMIN (SA_ROLE is consumer only)
-    set_force_user_connection(True)
     set_snow_cli_options(verbose=verbose, debug=debug)
     ctx.ensure_object(dict)
 
@@ -374,9 +493,7 @@ def policy() -> None:
 
 
 @rule.command(name="create")
-@click.option(
-    "--name", "-n", required=True, envvar="NW_RULE_NAME", help="Network rule name"
-)
+@click.option("--name", "-n", required=True, envvar="NW_RULE_NAME", help="Network rule name")
 @click.option("--db", required=True, envvar="NW_RULE_DB", help="Database for rule")
 @click.option(
     "--schema",
@@ -406,12 +523,8 @@ def policy() -> None:
     default=True,
     help="Include local IP (IPV4 only, default: ON)",
 )
-@click.option(
-    "--allow-gh", "-G", is_flag=True, help="Include GitHub Actions IPs (IPV4 only)"
-)
-@click.option(
-    "--allow-google", "-g", is_flag=True, help="Include Google IPs (IPV4 only)"
-)
+@click.option("--allow-gh", "-G", is_flag=True, help="Include GitHub Actions IPs (IPV4 only)")
+@click.option("--allow-google", "-g", is_flag=True, help="Include Google IPs (IPV4 only)")
 @click.option("--dry-run", is_flag=True, help="Preview SQL without executing")
 @click.option(
     "--force",
@@ -528,14 +641,73 @@ def rule_create(
                 click.echo(f"✓ Created policy: {policy_upper}")
 
 
-@rule.command(name="delete")
-@click.option(
-    "--name", "-n", required=True, envvar="NW_RULE_NAME", help="Network rule name"
-)
+@rule.command(name="update")
+@click.option("--name", "-n", required=True, envvar="NW_RULE_NAME", help="Network rule name")
 @click.option("--db", required=True, envvar="NW_RULE_DB", help="Database name")
+@click.option("--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name")
+@click.option("--values", help="Comma-separated values (CIDRs, hosts) to replace existing")
 @click.option(
-    "--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name"
+    "--allow-local/--no-local",
+    default=True,
+    help="Include local IP (IPV4 only, default: ON)",
 )
+@click.option("--allow-gh", "-G", is_flag=True, help="Include GitHub Actions IPs (IPV4 only)")
+@click.option("--allow-google", "-g", is_flag=True, help="Include Google IPs (IPV4 only)")
+@click.option("--dry-run", is_flag=True, help="Preview SQL without executing")
+def rule_update_cmd(
+    name: str,
+    db: str,
+    schema: str,
+    values: str | None,
+    allow_local: bool,
+    allow_gh: bool,
+    allow_google: bool,
+    dry_run: bool,
+) -> None:
+    """
+    Update (replace) values in an existing network rule.
+
+    This replaces ALL values in the rule. To add values, first list
+    existing values with DESCRIBE NETWORK RULE, then include them.
+
+    \b
+    Examples:
+        # Update with new local IP (e.g., after IP change)
+        network.py rule update --name my_rule --db my_db
+
+        # Replace with GitHub Actions IPs
+        network.py rule update --name ci_rule --db my_db --allow-gh --no-local
+
+        # Replace with specific CIDRs
+        network.py rule update --name my_rule --db my_db --values "10.0.0.0/8,192.168.1.0/24" --no-local
+    """
+    extra = [v.strip() for v in values.split(",")] if values else None
+    all_values = collect_ipv4_cidrs(allow_local, allow_gh, allow_google, extra)
+
+    if not all_values:
+        raise click.ClickException(
+            "No values specified. Use --allow-local, --allow-gh, --allow-google, or --values"
+        )
+
+    fqn = f"{db}.{schema}.{name}".upper()
+    click.echo(f"Updating network rule {fqn} with {len(all_values)} value(s)...")
+
+    update_network_rule(
+        name.upper(),
+        db.upper(),
+        schema.upper(),
+        all_values,
+        dry_run=dry_run,
+    )
+
+    if not dry_run:
+        click.echo(f"✓ Updated rule: {fqn}")
+
+
+@rule.command(name="delete")
+@click.option("--name", "-n", required=True, envvar="NW_RULE_NAME", help="Network rule name")
+@click.option("--db", required=True, envvar="NW_RULE_DB", help="Database name")
+@click.option("--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name")
 @click.confirmation_option(prompt="Delete this network rule?")
 def rule_delete_cmd(name: str, db: str, schema: str) -> None:
     """Delete a network rule."""
@@ -547,9 +719,7 @@ def rule_delete_cmd(name: str, db: str, schema: str) -> None:
 
 @rule.command(name="list")
 @click.option("--db", required=True, envvar="NW_RULE_DB", help="Database name")
-@click.option(
-    "--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name"
-)
+@click.option("--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name")
 def rule_list_cmd(db: str, schema: str) -> None:
     """List network rules in schema."""
     click.echo(f"Network rules in {db}.{schema}:".upper())
@@ -575,9 +745,7 @@ def rule_list_cmd(db: str, schema: str) -> None:
     help="Comma-separated fully qualified rule names (db.schema.rule)",
 )
 @click.option("--dry-run", is_flag=True, help="Preview SQL without executing")
-@click.option(
-    "--force", "-f", is_flag=True, help="Overwrite existing policy (CREATE OR REPLACE)"
-)
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing policy (CREATE OR REPLACE)")
 def policy_create_cmd(name: str, rules: str, dry_run: bool, force: bool) -> None:
     """
     Create a network policy with specified rules.
