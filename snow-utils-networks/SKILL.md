@@ -178,7 +178,7 @@ grep -E "^(SNOWFLAKE_USER|SNOW_UTILS_DB)=" .env
 | NW_RULE_DB | SNOW_UTILS_DB | "Database for network objects [use {SNOW_UTILS_DB}?]:" |
 | NW_RULE_NAME | SNOWFLAKE_USER | "Rule name [default: {USER}_LOCAL_ACCESS]:" |
 
-**Full prompt:**
+**Part 1 - Basic Configuration:**
 
 ```
 Network Rule Configuration:
@@ -187,15 +187,47 @@ Network Rule Configuration:
 2. Database for network objects:
    → Found SNOW_UTILS_DB=<value> - use same? [Y/n]:
 3. Schema [default: NETWORKS]:
-4. IP sources to include:
-   - [x] Local IP (auto-detected)
-   - [ ] GitHub Actions IPs
-   - [ ] Google IPs
-   - [ ] Custom CIDRs
-5. Create network policy? (name if yes):
+4. Create network policy? (name if yes):
 ```
 
-**⚠️ STOP**: Wait for user input.
+**Part 2 - IP Sources Selection (multi-select):**
+
+Use `ask_user_question` with `multiSelect: true`:
+
+```
+Which IP sources should be allowed access?
+(Select all that apply)
+
+☐ My current IP
+  Auto-detected local IP for development
+
+☐ GitHub Actions
+  Allow CI/CD workflows from GitHub (IPv4 only)
+
+☐ Google Cloud
+  Allow Cloud Run, GKE, Compute Engine
+
+☐ Custom CIDRs
+  I'll specify IP ranges
+```
+
+**CoCo Conversion Table:**
+
+| User Selection | CLI Flag |
+|----------------|----------|
+| My current IP | `--allow-local` |
+| GitHub Actions | `--allow-gh` |
+| Google Cloud | `--allow-google` |
+| Custom CIDRs | → Follow-up prompt → `--values "..."` |
+
+**If "Custom CIDRs" selected, prompt:**
+
+```
+Enter custom CIDRs (comma-separated):
+Example: 10.0.0.0/8, 192.168.1.0/24
+```
+
+**⚠️ STOP**: Wait for user input on ALL values.
 
 **After user provides input, update .env:**
 
@@ -203,7 +235,63 @@ Network Rule Configuration:
 - `NW_RULE_DB=<confirmed_value>` (may equal SNOW_UTILS_DB)
 - `NW_RULE_SCHEMA=<confirmed_value>`
 
-### Step 4: Preview (Dry Run)
+### Step 3.5: Check for Existing Network Rule
+
+**Check if network rule already exists:**
+
+```bash
+set -a && source .env && set +a && snow sql -q "SHOW NETWORK RULES LIKE '<NW_RULE_NAME>' IN SCHEMA <NW_RULE_DB>.<NW_RULE_SCHEMA>" --format json
+```
+
+**If rule exists**, use `ask_user_question` to ask:
+
+| Option | Action |
+|--------|--------|
+| Update existing | Use `network.py rule update` - modifies IPs, keeps policy intact |
+| Remove and recreate | Use `network.py rule delete` then `rule create` - fresh start |
+| Cancel | Stop workflow |
+
+**If user chooses "Update existing":**
+
+Show same IP sources multi-select as Step 3:
+
+```
+Which IP sources should be allowed access?
+(Select all that apply)
+
+☐ My current IP
+  Auto-detected local IP for development
+
+☐ GitHub Actions
+  Allow CI/CD workflows from GitHub (IPv4 only)
+
+☐ Google Cloud
+  Allow Cloud Run, GKE, Compute Engine
+
+☐ Custom CIDRs
+  I'll specify IP ranges
+```
+
+Then execute with converted flags:
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+  rule update --name <NW_RULE_NAME> --db <NW_RULE_DB> \
+  [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>]
+```
+
+Then skip to Step 6 (Verify).
+
+**If user chooses "Remove and recreate":**
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+  rule delete --name <NW_RULE_NAME> --db <NW_RULE_DB>
+```
+
+Then continue to Step 4.
+
+**If no rule exists:** Continue to Step 4.
 
 **Execute:**
 
