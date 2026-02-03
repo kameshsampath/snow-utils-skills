@@ -40,6 +40,7 @@ from snow_utils_common import (
     mask_sensitive_string,
     run_snow_sql,
     run_snow_sql_stdin,
+    set_force_user_connection,
     set_masking,
     set_snow_cli_options,
 )
@@ -511,15 +512,16 @@ def get_external_volume_sql(
 ) -> str:
     """Generate SQL for creating external volume.
 
-    Uses ACCOUNTADMIN for CREATE EXTERNAL VOLUME (account-level privilege).
+    Uses SA_ADMIN_ROLE for CREATE EXTERNAL VOLUME (account-level privilege).
     """
+    admin_role = os.environ.get("SA_ADMIN_ROLE", "ACCOUNTADMIN")
     allow_writes = "TRUE" if config.allow_writes else "FALSE"
     create_stmt = (
         "CREATE OR REPLACE EXTERNAL VOLUME"
         if force
         else "CREATE EXTERNAL VOLUME IF NOT EXISTS"
     )
-    return f"""USE ROLE ACCOUNTADMIN;
+    return f"""USE ROLE {admin_role};
 {create_stmt} {config.volume_name}
     STORAGE_LOCATIONS = (
         (
@@ -598,10 +600,11 @@ def describe_external_volume(volume_name: str) -> dict[str, str]:
 
 
 def drop_external_volume(volume_name: str) -> None:
-    """Drop Snowflake external volume. Uses ACCOUNTADMIN."""
+    """Drop Snowflake external volume. Uses SA_ADMIN_ROLE."""
+    admin_role = os.environ.get("SA_ADMIN_ROLE", "ACCOUNTADMIN")
     click.echo(f"Dropping Snowflake external volume: {volume_name}")
 
-    run_snow_sql(f"USE ROLE ACCOUNTADMIN; DROP EXTERNAL VOLUME IF EXISTS {volume_name}")
+    run_snow_sql(f"USE ROLE {admin_role}; DROP EXTERNAL VOLUME IF EXISTS {volume_name}")
     click.echo(f"✓ Dropped external volume: {volume_name}")
 
 
@@ -713,6 +716,8 @@ def cli(
     - Snowflake CLI configured (snow connection test)
     - Appropriate permissions in both AWS and Snowflake
     """
+    # Force user connection - external volumes need ACCOUNTADMIN (can't use SA_PAT)
+    set_force_user_connection(True)
     # Set global snow CLI options
     set_snow_cli_options(verbose=verbose, debug=debug)
 

@@ -9,7 +9,9 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Ice
 
 ## Workflow
 
-**📋 PREREQUISITE:** This skill requires `snow-utils-pat` to be run first. If SA_PAT is not set in .env, stop and direct user to run snow-utils-pat.
+**⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) for all operations. External volumes are account-level objects requiring SA_ADMIN_ROLE (defaults to ACCOUNTADMIN). SA_ROLE is a consumer-only role - apps/demos grant it USAGE on their Iceberg tables.
+
+**📋 NO PREREQUISITE:** This skill does NOT require snow-utils-pat. It operates independently using the user's connection with SA_ADMIN_ROLE privileges.
 
 **🚫 FORBIDDEN ACTIONS - NEVER DO THESE:**
 
@@ -79,7 +81,7 @@ tools_checked: true
    **If .env exists**, merge missing keys from .env.example:
    - Read existing .env
    - Add only keys that don't exist (preserve all existing values)
-   - Keys to check: SNOWFLAKE_DEFAULT_CONNECTION_NAME, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_ACCOUNT_URL, SA_ROLE, SA_USER, SNOW_UTILS_DB, SA_PAT, EXTERNAL_VOLUME_NAME, BUCKET, AWS_REGION, EXTVOLUME_PREFIX
+   - Keys to check: SNOWFLAKE_DEFAULT_CONNECTION_NAME, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_ACCOUNT_URL, EXTERNAL_VOLUME_NAME, BUCKET, AWS_REGION, EXTVOLUME_PREFIX
 
 3. **Check connection details in .env:**
 
@@ -137,46 +139,20 @@ If memory has `infra_ready: true` with `sa_role` and `snow_utils_db` values:
 set -a && source .env && set +a
 ```
 
-Read SA_ROLE, SA_USER, SNOW_UTILS_DB, and SA_PAT from .env:
+Verify the user connection works:
 
 ```bash
-grep -E "^(SA_ROLE|SA_USER|SNOW_UTILS_DB|SA_PAT)=" .env
+set -a && source .env && set +a && snow connection test -c ${SNOWFLAKE_DEFAULT_CONNECTION_NAME} --format json
 ```
 
-**If SA_ROLE or SNOW_UTILS_DB is empty**, run check_setup.py first:
-
-```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
-```
-
-**If SA_PAT is empty:**
-
-⚠️ **STOP** - Service account PAT is required before creating volumes.
-
-Tell the user:
-
-```
-SA_PAT is not set. You need to create a PAT for the service account first.
-
-Run the snow-utils-pat skill to create the PAT:
-  "Create a PAT for service account"
-
-This ensures the external volume is created using the service account credentials.
-```
-
-**Do NOT proceed** until SA_PAT is populated in .env.
-
-**If ALL values present (SA_ROLE, SA_USER, SNOW_UTILS_DB, SA_PAT):**
+**If connection test succeeds:**
 
 **Update memory:**
 
 ```
 Update /memories/snow-utils-prereqs.md:
 tools_checked: true
-infra_ready: true
-sa_role: <SA_ROLE>
-snow_utils_db: <SNOW_UTILS_DB>
-sa_admin_role: <SA_ADMIN_ROLE>
+connection_verified: true
 ```
 
 Continue to Step 3.
@@ -357,7 +333,11 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
   create --bucket ${BUCKET} --output json
 ```
 
-**On success:** Update .env with created volume name, show example Iceberg table DDL.
+**On success:**
+
+- Update .env with created volume name
+- Show example Iceberg table DDL
+- Write cleanup manifest (see Step 8)
 
 **On failure:** Rollback is automatic. Present error.
 
@@ -371,6 +351,71 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 ```
 
 **Present** verification result and summary of created resources.
+
+### Step 8: Write Success Summary and Cleanup Manifest
+
+**After successful creation, append to `snow-utils-manifest.md` in project directory.**
+
+If file doesn't exist, create with header:
+
+```markdown
+# Snow-Utils Manifest
+
+This manifest tracks resources created by snow-utils skills.
+Each section can be cleaned up independently.
+```
+
+**Append skill section:**
+
+```markdown
+## snow-utils-volumes
+Created: <TIMESTAMP>
+
+| Type | Name | Location |
+|------|------|----------|
+| S3 Bucket | hirc-duckdb-demo-iceberg | AWS (us-west-2) |
+| IAM Role | hirc-duckdb-demo-iceberg-snowflake-role | AWS |
+| IAM Policy | hirc-duckdb-demo-iceberg-snowflake-policy | AWS |
+| External Volume | HIRC_DUCKDB_DEMO_ICEBERG_EXTERNAL_VOLUME | Snowflake (account-level) |
+
+### Cleanup
+
+```sql
+-- 1. Drop external volume (Snowflake)
+-- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
+USE ROLE <SA_ADMIN_ROLE>;
+DROP EXTERNAL VOLUME IF EXISTS HIRC_DUCKDB_DEMO_ICEBERG_EXTERNAL_VOLUME;
+```
+
+```bash
+# 2. Delete IAM role (AWS)
+aws iam delete-role-policy --role-name hirc-duckdb-demo-iceberg-snowflake-role --policy-name inline-policy 2>/dev/null || true
+aws iam delete-role --role-name hirc-duckdb-demo-iceberg-snowflake-role
+
+# 3. Delete IAM policy (AWS)
+aws iam delete-policy --policy-arn arn:aws:iam::<ACCOUNT>:policy/hirc-duckdb-demo-iceberg-snowflake-policy
+
+# 4. Delete S3 bucket (AWS - must be empty)
+aws s3 rb s3://hirc-duckdb-demo-iceberg --force
+```
+
+```
+
+**Display success summary to user:**
+
+```
+
+External Volume Setup Complete!
+
+Resources Created:
+  S3 Bucket:        hirc-duckdb-demo-iceberg (us-west-2)
+  IAM Role:         hirc-duckdb-demo-iceberg-snowflake-role
+  IAM Policy:       hirc-duckdb-demo-iceberg-snowflake-policy
+  External Volume:  HIRC_DUCKDB_DEMO_ICEBERG_EXTERNAL_VOLUME
+
+Manifest appended to: ./snow-utils-manifest.md
+
+```
 
 ## Tools
 

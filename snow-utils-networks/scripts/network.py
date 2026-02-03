@@ -30,6 +30,7 @@ from snow_utils_common import (
     get_valid_types_for_mode,
     run_snow_sql,
     run_snow_sql_stdin,
+    set_force_user_connection,
     set_snow_cli_options,
     validate_mode_type,
 )
@@ -354,6 +355,8 @@ def cli(ctx: click.Context, verbose: bool, debug: bool) -> None:
       rule    - Manage network rules (create, list, delete)
       policy  - Manage network policies (create, list, delete)
     """
+    # Force user connection - network creation needs ACCOUNTADMIN (SA_ROLE is consumer only)
+    set_force_user_connection(True)
     set_snow_cli_options(verbose=verbose, debug=debug)
     ctx.ensure_object(dict)
 

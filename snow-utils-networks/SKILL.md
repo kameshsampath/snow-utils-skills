@@ -11,6 +11,8 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 **📋 PREREQUISITE:** This skill requires `snow-utils-pat` to be run first. If SA_PAT is not set in .env, stop and direct user to run snow-utils-pat.
 
+**⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) for all object creation. SA_ROLE is a consumer-only role with no CREATE privileges. Uses SA_ADMIN_ROLE (defaults to ACCOUNTADMIN) for privileged operations. After creation, USAGE grants are given to SA_ROLE so apps/demos can use the resources via SA_PAT.
+
 **🚫 FORBIDDEN ACTIONS - NEVER DO THESE:**
 
 - NEVER run SQL queries to discover/find/check values (no SHOW ROLES, SHOW DATABASES, SHOW NETWORK RULES)
@@ -250,7 +252,10 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
   [--policy <POLICY_NAME>]
 ```
 
-**On success:** Show created rule FQN and policy name.
+**On success:**
+
+- Show created resources
+- Write cleanup manifest (see Step 7)
 
 **On failure:** Present error and remediation steps.
 
@@ -259,6 +264,58 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
   rule list --db <NW_RULE_DB>
+```
+
+### Step 7: Write Success Summary and Cleanup Manifest
+
+**After successful creation, append to `snow-utils-manifest.md` in project directory.**
+
+If file doesn't exist, create with header:
+
+```markdown
+# Snow-Utils Manifest
+
+This manifest tracks resources created by snow-utils skills.
+Each section can be cleaned up independently.
+```
+
+**Append skill section:**
+
+```markdown
+## snow-utils-networks
+Created: <TIMESTAMP>
+
+| Type | Name | Location |
+|------|------|----------|
+| Network Rule | HIRC_DUCKDB_DEMO_ACCESS_RULE | KAMESHS_SNOW_UTILS.NETWORKS |
+| Network Policy | HIRC_DUCKDB_DEMO_ACCESS_POLICY | Account |
+
+### Cleanup
+
+```sql
+-- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
+USE ROLE <SA_ADMIN_ROLE>;
+-- 1. Drop network policy (account-level)
+DROP NETWORK POLICY IF EXISTS HIRC_DUCKDB_DEMO_ACCESS_POLICY;
+-- 2. Drop network rule (schema-level)
+DROP NETWORK RULE IF EXISTS KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_ACCESS_RULE;
+```
+
+```
+
+**Display success summary to user:**
+
+```
+
+Network Setup Complete!
+
+Resources Created:
+  Network Rule:   KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_ACCESS_RULE
+  Network Policy: HIRC_DUCKDB_DEMO_ACCESS_POLICY
+  CIDRs:          192.168.1.1/32, 10.0.0.0/8
+
+Manifest appended to: ./snow-utils-manifest.md
+
 ```
 
 ## Tools

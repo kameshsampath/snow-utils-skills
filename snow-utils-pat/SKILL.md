@@ -9,18 +9,27 @@ Creates service users, network policies, authentication policies, and Programmat
 
 ## Workflow
 
-**🚫 FORBIDDEN ACTIONS - NEVER DO THESE:**
+**FORBIDDEN ACTIONS - NEVER DO THESE:**
 
 - NEVER run SQL queries to discover/find/check values (no SHOW ROLES, SHOW DATABASES, SHOW USERS)
 - NEVER auto-populate empty .env values by querying Snowflake
 - NEVER use flags that bypass user interaction: `--yes`, `-y`, `--auto-setup`, `--auto-approve`, `--quiet`, `--force`, `--non-interactive`
 - NEVER assume user consent - always ask and wait for explicit confirmation
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
+- NEVER display PAT tokens in diffs, logs, or output - always mask as `***REDACTED***`
 - If .env values are empty, prompt user or run check_setup.py
 
-**✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
+**INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
-**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
+**⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) to create the SA infrastructure. It requires SA_ADMIN_ROLE (defaults to ACCOUNTADMIN) to create users, network policies, and authentication policies. The output (SA_PAT) is then used by apps/demos to consume resources.
+
+**📌 ROLE MODEL:**
+
+- **SA_ADMIN_ROLE** (ACCOUNTADMIN): Creates and owns all objects
+- **SA_ROLE** (`{PROJECT}_ACCESS`): Consumer-only role for PAT restriction. Apps/demos grant it access to their resources.
+- **SA_USER** (`{PROJECT}_RUNNER`): Service user with PAT, restricted to SA_ROLE
+
+**ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
 
 ### Step 0: Check Prerequisites (with Memory Caching)
 
@@ -49,7 +58,7 @@ command -v snow >/dev/null 2>&1 && echo "snow: OK" || echo "snow: MISSING"
 | `uv` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | `snow` | `pip install snowflake-cli` or `uv tool install snowflake-cli` |
 
-**⚠️ STOP**: Do not proceed until all prerequisites are installed.
+**STOP**: Do not proceed until all prerequisites are installed.
 
 **After tools verified, update memory:**
 
@@ -162,40 +171,50 @@ snow_utils_db: <VALUE>
 sa_admin_role: <VALUE>
 ```
 
-### Step 3: Gather Requirements (with Semantic Prompts)
+### Step 3: Gather Requirements (Demo-Context Naming)
 
-Read existing values from .env for semantic suggestions:
+**Detect demo context from current directory:**
+
+```bash
+basename $(pwd)
+```
+
+Example: `hirc-duckdb-demo` → demo context = `HIRC_DUCKDB_DEMO`
+
+**Read existing values from .env:**
 
 ```bash
 grep -E "^(SNOWFLAKE_USER|SA_ROLE|SNOW_UTILS_DB)=" .env
 ```
 
-**Prompt for skill-specific values with semantic defaults:**
+**NAMING CONVENTION (Demo-Context):**
 
-| Variable | Semantic Match | Prompt |
-|----------|---------------|--------|
-| SA_USER | SNOWFLAKE_USER | "Service user name [default: {SNOWFLAKE_USER}_service]:" |
-| SA_ADMIN_ROLE | - | "Admin role for setup/policies [default: ACCOUNTADMIN]:" |
+Both SA_ROLE and service user should use demo context for consistency:
 
-**Full prompt:**
+| Variable | Pattern | Example (demo=hirc-duckdb-demo) |
+|----------|---------|--------------------------------|
+| SA_ROLE | `{DEMO}_ACCESS` | `HIRC_DUCKDB_DEMO_ACCESS` |
+| SA_USER | `{DEMO}_RUNNER` | `HIRC_DUCKDB_DEMO_RUNNER` |
+
+**Prompt for skill-specific values with demo-aware defaults:**
 
 ```
-PAT Configuration:
+PAT Configuration for demo: <DEMO_CONTEXT>
 
-1. Service user name [default: <SNOWFLAKE_USER>_service]:
-2. PAT role (role the service account can use):
-3. Admin role for setup and policies [default: ACCOUNTADMIN]:
-4. Database for policy objects:
-   → Found SNOW_UTILS_DB=<value> - use same? [Y/n]:
+1. Service user name [default: <DEMO>_RUNNER]:
+2. PAT role [default: <DEMO>_ACCESS]:
+3. Admin role for setup [default: from .env or ACCOUNTADMIN]:
+4. Database for policy objects [default: from SNOW_UTILS_DB]:
 5. PAT expiry days [default: 30]:
 ```
 
-**⚠️ STOP**: Wait for user input.
+**STOP**: Wait for user input.
 
 **After user provides input, update .env:**
 
 - `SA_USER=<confirmed_value>`
-- `SA_ADMIN_ROLE=<confirmed_value>` (may equal SA_ROLE)
+- `SA_ROLE=<confirmed_value>`
+- `SA_ADMIN_ROLE=<confirmed_value>`
 
 ### Step 4: Preview (Dry Run)
 
@@ -203,58 +222,64 @@ PAT Configuration:
 
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  create --user <SA_USER> --role <PAT_ROLE> --db <SNOW_UTILS_DB> --dry-run
+  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --dry-run
 ```
 
-**🔴 CRITICAL: SHOW BOTH SUMMARY AND FULL SQL**
+**CRITICAL: SHOW BOTH SUMMARY AND FULL SQL**
 
 After running dry-run, display output in TWO parts:
 
 **Part 1 - Resource Summary (brief):**
 
 ```
-User:     MY_SERVICE_USER
-Role:     MY_ROLE
-Database: MY_DB
-PAT Name: MY_SERVICE_USER_PAT
+Resources to create:
+  User:              HIRC_DUCKDB_DEMO_RUNNER
+  Role:              HIRC_DUCKDB_DEMO_ACCESS
+  Network Rule:      KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE
+  Network Policy:    HIRC_DUCKDB_DEMO_RUNNER_NETWORK_POLICY
+  Auth Policy:       KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY
+  PAT Name:          HIRC_DUCKDB_DEMO_RUNNER_PAT
 ```
 
 **Part 2 - Full SQL (MANDATORY - do not skip on first display):**
 
 ```sql
 -- Step 1: Create service user
-USE ROLE accountadmin;
-CREATE USER IF NOT EXISTS MY_SERVICE_USER
+-- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
+USE ROLE <SA_ADMIN_ROLE>;
+CREATE USER IF NOT EXISTS HIRC_DUCKDB_DEMO_RUNNER
     TYPE = SERVICE
     COMMENT = 'Service user for PAT access';
-GRANT ROLE MY_ROLE TO USER MY_SERVICE_USER;
+GRANT ROLE HIRC_DUCKDB_DEMO_ACCESS TO USER HIRC_DUCKDB_DEMO_RUNNER;
 
 -- Step 2: Create network rule and policy
-CREATE NETWORK RULE MY_DB.NETWORKS.MY_SERVICE_USER_NETWORK_RULE
+USE ROLE <SA_ADMIN_ROLE>;
+CREATE NETWORK RULE KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE
     MODE = INGRESS
     TYPE = IPV4
     VALUE_LIST = ('192.168.1.1/32')
     COMMENT = 'Created by snow-utils';
 
 -- Step 3: Create authentication policy
-CREATE SCHEMA IF NOT EXISTS MY_DB.POLICIES;
-CREATE OR ALTER AUTHENTICATION POLICY MY_DB.POLICIES.MY_SERVICE_USER_AUTH_POLICY
+USE ROLE <SA_ADMIN_ROLE>;
+CREATE SCHEMA IF NOT EXISTS KAMESHS_SNOW_UTILS.POLICIES;
+CREATE OR ALTER AUTHENTICATION POLICY KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY
     AUTHENTICATION_METHODS = ('PROGRAMMATIC_ACCESS_TOKEN')
     PAT_POLICY = (
-        default_expiry_in_days = 45,
+        default_expiry_in_days = 30,
         max_expiry_in_days = 90,
         network_policy_evaluation = ENFORCED_REQUIRED
     );
 
-ALTER USER MY_SERVICE_USER SET AUTHENTICATION POLICY MY_DB.POLICIES.MY_SERVICE_USER_AUTH_POLICY;
+ALTER USER HIRC_DUCKDB_DEMO_RUNNER SET AUTHENTICATION POLICY KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY;
 
 -- Step 4: Create PAT
-ALTER USER IF EXISTS MY_SERVICE_USER ADD PAT MY_SERVICE_USER_PAT ROLE_RESTRICTION = MY_ROLE;
+ALTER USER IF EXISTS HIRC_DUCKDB_DEMO_RUNNER ADD PAT HIRC_DUCKDB_DEMO_RUNNER_PAT ROLE_RESTRICTION = HIRC_DUCKDB_DEMO_ACCESS;
 ```
 
 **FORBIDDEN:** Showing only summary without SQL. User MUST see BOTH parts on first display.
 
-**⚠️ STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
+**STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 
 ### Step 5: Create Resources
 
@@ -262,13 +287,14 @@ ALTER USER IF EXISTS MY_SERVICE_USER ADD PAT MY_SERVICE_USER_PAT ROLE_RESTRICTIO
 
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  create --user <SA_USER> --role <PAT_ROLE> --db <SNOW_UTILS_DB> --output json
+  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --output json
 ```
 
 **On success:**
 
 - Token is written to .env as SA_PAT
 - Show connection verification result
+- **Write cleanup manifest** (see Step 7)
 
 **On failure:** Present error and remediation steps.
 
@@ -283,6 +309,98 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
   verify --user <SA_USER>
 ```
 
+### Step 7: Write Success Summary and Cleanup Manifest
+
+**After successful creation, append to `snow-utils-manifest.md` in project directory.**
+
+If file doesn't exist, create with header:
+
+```markdown
+# Snow-Utils Manifest
+
+This manifest tracks resources created by snow-utils skills.
+Each section can be cleaned up independently.
+```
+
+**Append skill section:**
+
+```markdown
+## snow-utils-pat
+Created: <TIMESTAMP>
+
+| Type | Name | Location |
+|------|------|----------|
+| User | HIRC_DUCKDB_DEMO_RUNNER | Account |
+| Role | HIRC_DUCKDB_DEMO_ACCESS | Account |
+| Network Rule | HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE | KAMESHS_SNOW_UTILS.NETWORKS |
+| Network Policy | HIRC_DUCKDB_DEMO_RUNNER_NETWORK_POLICY | Account |
+| Auth Policy | HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY | KAMESHS_SNOW_UTILS.POLICIES |
+| PAT | HIRC_DUCKDB_DEMO_RUNNER_PAT | User: HIRC_DUCKDB_DEMO_RUNNER |
+
+### Cleanup (execute in order)
+
+```sql
+-- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
+USE ROLE <SA_ADMIN_ROLE>;
+-- 1. Remove PAT
+ALTER USER HIRC_DUCKDB_DEMO_RUNNER REMOVE PAT HIRC_DUCKDB_DEMO_RUNNER_PAT;
+-- 2. Unset auth policy (MUST do before drop)
+ALTER USER HIRC_DUCKDB_DEMO_RUNNER UNSET AUTHENTICATION POLICY;
+-- 3. Drop auth policy
+DROP AUTHENTICATION POLICY IF EXISTS KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY;
+-- 4. Unset network policy
+ALTER USER HIRC_DUCKDB_DEMO_RUNNER UNSET NETWORK POLICY;
+-- 5. Drop network policy
+DROP NETWORK POLICY IF EXISTS HIRC_DUCKDB_DEMO_RUNNER_NETWORK_POLICY;
+-- 6. Drop network rule
+DROP NETWORK RULE IF EXISTS KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE;
+-- 7. Drop user
+DROP USER IF EXISTS HIRC_DUCKDB_DEMO_RUNNER;
+-- 8. Drop role (optional)
+-- DROP ROLE IF EXISTS HIRC_DUCKDB_DEMO_ACCESS;
+```
+
+### One-liner
+
+```bash
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user <SA_USER> --db <SNOW_UTILS_DB>
+```
+
+```
+
+**Display success summary to user:**
+
+```
+
+PAT Setup Complete!
+
+Resources Created:
+  User:           HIRC_DUCKDB_DEMO_RUNNER
+  Role:           HIRC_DUCKDB_DEMO_ACCESS
+  Network Rule:   KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE
+  Network Policy: HIRC_DUCKDB_DEMO_RUNNER_NETWORK_POLICY
+  Auth Policy:    KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY
+  PAT:            ***REDACTED*** (saved to .env as SA_PAT)
+
+Manifest appended to: ./snow-utils-manifest.md
+
+```
+
+## PAT Security
+
+**NEVER display PAT tokens in:**
+- Diff output
+- Log messages
+- Console output (except initial creation confirmation)
+- Summary displays
+
+**Always mask as:** `***REDACTED***`
+
+**When showing .env changes:**
+```diff
++ SA_PAT=***REDACTED***
+```
+
 ## Tools
 
 ### check_setup.py
@@ -295,7 +413,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
 ```
 
-**⚠️ DO NOT ADD ANY FLAGS.**
+**DO NOT ADD ANY FLAGS.**
 
 **Options:**
 
@@ -308,7 +426,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 **Commands:**
 
 - `create`: Create service user, policies, and PAT
-- `remove`: Remove all PAT-related resources
+- `remove`: Remove all PAT-related resources (follows correct cleanup order)
 - `rotate`: Rotate existing PAT
 - `verify`: Test PAT connection
 
@@ -316,7 +434,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 - `--user`: Service user name (required)
 - `--role`: PAT role restriction (required)
-- `--admin-role`: Role for creating policies (default: same as --role)
+- `--admin-role`: Role for creating policies (default: from SA_ADMIN_ROLE env)
 - `--db`: Database for policy objects (required)
 - `--dry-run`: Preview without creating
 - `--output json`: Machine-readable output
@@ -325,10 +443,10 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 ## Stopping Points
 
-- ✋ Step 1: If connection checks fail
-- ✋ Step 2: If infra check needed (prompts user)
-- ✋ Step 3: After gathering requirements
-- ✋ Step 4: After dry-run preview (get approval)
+- Step 1: If connection checks fail
+- Step 2: If infra check needed (prompts user)
+- Step 3: After gathering requirements
+- Step 4: After dry-run preview (get approval)
 
 ## Output
 
@@ -336,8 +454,9 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 - Network rule with local IP
 - Network policy (ENFORCED_REQUIRED)
 - Authentication policy (PROGRAMMATIC_ACCESS_TOKEN only)
-- PAT token (saved to .env as SA_PAT)
+- PAT token (saved to .env as SA_PAT, masked in output)
 - Updated .env with all values
+- Cleanup manifest (snow-utils-manifest.md)
 
 ## Troubleshooting
 
@@ -349,9 +468,12 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 **Connection verification failed:** Check network policy allows your IP.
 
+**Cannot drop database (policy attached):** Use `snow-utils-manifest.md` cleanup commands in order, or run `pat.py remove`.
+
 ## Security Notes
 
 - PAT tokens stored in .env with proper escaping
+- PAT tokens NEVER displayed in diffs or logs (masked as ***REDACTED***)
 - Network policy restricts access to specified IPs only
 - Auth policy enforces PAT-only authentication
 - Tokens have configurable expiry (default 30 days)
