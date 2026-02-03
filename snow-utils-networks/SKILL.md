@@ -652,14 +652,24 @@ If you need IPv6 support, you would need to create a separate network rule with 
 
 **Infrastructure not set up:** Run `python -m snow_utils_common.check_setup` from common - it will prompt and offer to create.
 
-**Permission denied:** SA_ROLE needs CREATE NETWORK RULE and CREATE NETWORK POLICY privileges.
+**Permission denied:** Ensure SA_ADMIN_ROLE (from .env, defaults to ACCOUNTADMIN) has CREATE NETWORK RULE and CREATE NETWORK POLICY privileges. SA_ROLE is consumer-only and cannot create resources.
 
-**Rule already exists:** Use --force to replace existing rule.
+**Rule already exists:** Use Step 3.5 flow - choose "Update existing" to modify IPs or "Remove and recreate" for fresh start.
 
-**Invalid CIDR:** Ensure CIDRs are in x.x.x.x/mask format.
+**Invalid CIDR:** Ensure CIDRs are in x.x.x.x/mask format (e.g., `192.168.1.0/24`, `10.0.0.0/8`).
+
+**GitHub Actions IPs not working:** Only IPv4 ranges are included. GitHub provides IPv6 ranges too, but Snowflake `TYPE = IPV4` rules don't support them.
+
+**Cannot find resources for cleanup:** Check `.snow-utils/snow-utils-manifest.md` for exact resource names. Use manifest-based cleanup instead of guessing names.
+
+**Partial creation failed:** If manifest shows `Status: IN_PROGRESS`, use Resume flow to continue from where it stopped, or manually clean up created resources using manifest cleanup instructions.
+
+**Policy depends on rule:** When cleaning up, drop network policy BEFORE dropping network rule (policy references the rule).
 
 ## Security Notes
 
 - Network rules control IP-based access to Snowflake
 - INGRESS rules restrict incoming connections
 - Use specific CIDRs, not 0.0.0.0/0
+- Review IP sources periodically - GitHub/Google ranges change over time
+- Use `--allow-local` for development, restrict to known CIDRs for production
