@@ -203,12 +203,23 @@ PAT Configuration for demo: <DEMO_CONTEXT>
 
 1. Service user name [default: <DEMO>_RUNNER]:
 2. PAT role [default: <DEMO>_ACCESS]:
-3. Admin role for setup [default: from .env or ACCOUNTADMIN]:
+3. Admin role for setup [default: from SA_ADMIN_ROLE in .env, or ACCOUNTADMIN]:
 4. Database for policy objects [default: from SNOW_UTILS_DB]:
-5. PAT expiry days [default: 30]:
 ```
 
-**STOP**: Wait for user input.
+**Auth policy expiry settings (ALWAYS ask user to confirm):**
+
+| Setting | Snowflake Default | Description |
+|---------|-------------------|-------------|
+| Default expiry | 15 days | How long PAT is valid by default |
+| Max expiry | 365 days | Maximum allowed expiry |
+
+```
+5. PAT default expiry days [default: 15]:
+6. PAT max expiry days [default: 365]:
+```
+
+**STOP**: Wait for user input on ALL values including expiry settings.
 
 **After user provides input, update .env:**
 
