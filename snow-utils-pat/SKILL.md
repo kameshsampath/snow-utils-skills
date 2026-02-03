@@ -495,23 +495,132 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 
 **Description:** Creates and manages Snowflake PATs with network and auth policies.
 
+**CRITICAL RULES FOR COCO:**
+
+| Rule | Description |
+|------|-------------|
+| **Always confirm** | NEVER execute create, remove, or rotate without explicit user confirmation |
+| **Show what will happen** | Display SQL preview or summary BEFORE asking for confirmation |
+| **One operation at a time** | Don't chain multiple destructive operations |
+| **Fail fast** | Check prerequisites before running; stop with clear error if not met |
+
+**Pre-Check Rules (Fail Fast):**
+
+| Command | Pre-Check | If Fails |
+|---------|-----------|----------|
+| `create` | User doesn't exist | Stop: "User {SA_USER} already exists. Use `rotate` to refresh token or `remove` first." |
+| `rotate` | PAT exists for user | Stop: "No existing PAT found for {SA_USER}. Use `create` instead." |
+| `remove` | User/resources exist | Proceed gracefully (idempotent with IF EXISTS) |
+
+**Command Selection Rules:**
+
+| Scenario | Command | When to Use |
+|----------|---------|-------------|
+| New PAT needed | `create` | User has no existing PAT, or chose "Remove and recreate" in Step 3.5 |
+| PAT exists, refresh token | `rotate` | User chose "Rotate existing" in Step 3.5 - keeps all policies |
+| Full cleanup | `remove` | User explicitly requests cleanup, or "Remove and recreate" before create |
+| Test connection | `verify` | After create or rotate to confirm PAT works |
+
+**Confirmation Flow:**
+
+1. **create**: Show SQL preview (Step 4) → Ask "Proceed with creation?" → Execute only on "yes"
+2. **remove**: Show resources to be deleted → Ask "Confirm deletion of these resources?" → Execute only on "yes"  
+3. **rotate**: Show current PAT info → Ask "Rotate PAT for user X?" → Execute only on "yes"
+
+**Post-Operation Rules:**
+
+| Command | After Success |
+|---------|---------------|
+| `create` | Update .env (SA_PAT) → Run `verify` → Add section to `.snow-utils/snow-utils-manifest.md` |
+| `rotate` | Update .env (SA_PAT with new token) → Run `verify` |
+| `remove` | Clear SA_PAT from .env → Remove `snow-utils-pat` section from `.snow-utils/snow-utils-manifest.md` |
+
 **Commands:**
 
-- `create`: Create service user, policies, and PAT
-- `remove`: Remove all PAT-related resources (follows correct cleanup order)
-- `rotate`: Rotate existing PAT
-- `verify`: Test PAT connection
+| Command | Description |
+|---------|-------------|
+| `create` | Create service user, policies, and PAT |
+| `remove` | Remove all PAT-related resources (dependency-aware order) |
+| `rotate` | Regenerate PAT token, keeps all policies intact |
+| `verify` | Test PAT connection using `snow sql -x` |
 
-**Create Options:**
+#### create
 
-- `--user`: Service user name (required)
-- `--role`: PAT role restriction (required)
-- `--admin-role`: Role for creating policies (default: from SA_ADMIN_ROLE env)
-- `--db`: Database for policy objects (required)
-- `--dry-run`: Preview without creating
-- `--output json`: Machine-readable output
-- `--local-ip`: Override auto-detected IP
-- `--default-expiry-days`: Token expiry (default: 30)
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --output json
+```
+
+**Options:**
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--user` | Yes | - | Service user name |
+| `--role` | Yes | - | PAT role restriction |
+| `--admin-role` | No | SA_ADMIN_ROLE env | Role for creating policies |
+| `--db` | Yes | - | Database for policy objects |
+| `--dry-run` | No | false | Preview SQL without executing |
+| `--output json` | No | text | Machine-readable output |
+| `--local-ip` | No | auto-detect | Override IP for network rule |
+| `--default-expiry-days` | No | 15 | PAT default expiry (Snowflake default) |
+| `--max-expiry-days` | No | 365 | PAT max expiry (Snowflake default) |
+
+#### remove
+
+Removes all PAT-related resources in correct dependency order:
+PAT → Auth Policy (unset) → User → Auth Policy (drop) → Network Policy → Network Rule
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  remove --user <SA_USER> --db <SNOW_UTILS_DB>
+```
+
+**Options:**
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--user` | Yes | - | Service user to remove |
+| `--db` | Yes | - | Database containing policies |
+| `--admin-role` | No | SA_ADMIN_ROLE env | Role for dropping resources |
+| `--dry-run` | No | false | Preview DROP statements |
+
+#### rotate
+
+Regenerates PAT token while keeping all existing policies intact.
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  rotate --user <SA_USER> --role <SA_ROLE>
+```
+
+**Options:**
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--user` | Yes | - | Service user with existing PAT |
+| `--role` | Yes | - | Role restriction for new PAT |
+| `--admin-role` | No | SA_ADMIN_ROLE env | Role for rotation |
+
+**After rotation:** Updates SA_PAT in .env with new token.
+
+#### verify
+
+Tests PAT authentication using `snow sql -x` (external/passwordless auth).
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  verify --user <SA_USER> --role <SA_ROLE>
+```
+
+**Options:**
+
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `--user` | Yes | - | Service user to verify |
+| `--role` | Yes | - | Role to test with |
+| `--debug` | No | false | Show detailed connection info |
+
+**Verification runs:** `SELECT current_timestamp()` to confirm auth works.
 
 ## Stopping Points
 
