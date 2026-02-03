@@ -376,40 +376,163 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 ### Step 7: Write Success Summary and Cleanup Manifest
 
-**After successful creation, append to `snow-utils-manifest.md` in project directory.**
+**Manifest Location:** `.snow-utils/snow-utils-manifest.md`
 
-If file doesn't exist, create with header:
+**Create directory if needed:**
+
+```bash
+mkdir -p .snow-utils
+```
+
+**If manifest doesn't exist, create with header:**
 
 ```markdown
 # Snow-Utils Manifest
 
-This manifest tracks resources created by snow-utils skills.
-Each section can be cleaned up independently.
+This manifest tracks Snowflake resources created by snow-utils skills.
+Each skill section is bounded by START/END markers for easy identification.
+CoCo can use this manifest to replay creation or cleanup resources.
+
+---
 ```
 
-**Append skill section:**
+#### Progressive Manifest Writing
+
+**Update manifest AFTER EACH resource is successfully created (not at the end).**
+
+**After network rule created:**
 
 ```markdown
-## snow-utils-networks
-Created: <TIMESTAMP>
+<!-- START -- snow-utils-networks -->
+## Network Resources: {COMMENT_PREFIX}
 
-| Type | Name | Location |
-|------|------|----------|
-| Network Rule | HIRC_DUCKDB_DEMO_ACCESS_RULE | KAMESHS_SNOW_UTILS.NETWORKS |
-| Network Policy | HIRC_DUCKDB_DEMO_ACCESS_POLICY | Account |
+**Created:** {TIMESTAMP}
+**Rule Name:** {NW_RULE_NAME}
+**Database:** {NW_RULE_DB}
+**Status:** IN_PROGRESS
 
-### Cleanup
+### Resources (creation order)
+
+| # | Type | Name | Location | Status |
+|---|------|------|----------|--------|
+| 1 | Network Rule | {NW_RULE_NAME} | {NW_RULE_DB}.{NW_RULE_SCHEMA} | ✓ |
+| 2 | Network Policy | {NW_RULE_NAME}_POLICY | Account | pending |
+
+### IP Sources
+
+| Source | Included |
+|--------|----------|
+| Local IP | {LOCAL_IP} |
+| GitHub Actions | {yes/no} |
+| Google Cloud | {yes/no} |
+| Custom CIDRs | {list or none} |
+<!-- END -- snow-utils-networks -->
+```
+
+**After all resources created, update Status to COMPLETE and add cleanup:**
+
+```markdown
+<!-- START -- snow-utils-networks -->
+## Network Resources: {COMMENT_PREFIX}
+
+**Created:** {TIMESTAMP}
+**Rule Name:** {NW_RULE_NAME}
+**Database:** {NW_RULE_DB}
+**Status:** COMPLETE
+
+### Resources (creation order)
+
+| # | Type | Name | Location | Status |
+|---|------|------|----------|--------|
+| 1 | Network Rule | {NW_RULE_NAME} | {NW_RULE_DB}.{NW_RULE_SCHEMA} | ✓ |
+| 2 | Network Policy | {NW_RULE_NAME}_POLICY | Account | ✓ |
+
+### IP Sources
+
+| Source | Included |
+|--------|----------|
+| Local IP | {LOCAL_IP} |
+| GitHub Actions | {yes/no} |
+| Google Cloud | {yes/no} |
+| Custom CIDRs | {list or none} |
+
+### Cleanup Instructions (dependency order)
 
 ```sql
--- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
-USE ROLE <SA_ADMIN_ROLE>;
--- 1. Drop network policy (account-level)
-DROP NETWORK POLICY IF EXISTS HIRC_DUCKDB_DEMO_ACCESS_POLICY;
--- 2. Drop network rule (schema-level)
-DROP NETWORK RULE IF EXISTS KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_ACCESS_RULE;
+USE ROLE {SA_ADMIN_ROLE};
+-- 1. Drop network policy first (depends on rule)
+DROP NETWORK POLICY IF EXISTS {NW_RULE_NAME}_POLICY;
+-- 2. Drop network rule
+DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 ```
 
+### CLI Cleanup
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py rule delete --name {NW_RULE_NAME} --db {NW_RULE_DB}
 ```
+<!-- END -- snow-utils-networks -->
+```
+
+#### Remove Flow (Reads Manifest First)
+
+**On `rule delete` command:**
+
+1. **Check manifest exists:** `.snow-utils/snow-utils-manifest.md`
+2. **If exists:** Read `<!-- START -- snow-utils-networks -->` section for exact resource names
+3. **Use manifest values** for cleanup instead of inferring from naming convention
+4. **After cleanup success:** Remove the `<!-- START -- snow-utils-networks -->` to `<!-- END -- snow-utils-networks -->` section
+5. **If manifest becomes empty** (only header): Optionally delete the file
+
+#### Replay Flow (Single Confirmation)
+
+**If user asks to replay/recreate from manifest:**
+
+1. **Read manifest** `.snow-utils/snow-utils-manifest.md`
+2. **Find section** `<!-- START -- snow-utils-networks -->`
+3. **Display info summary with single confirmation:**
+
+```
+
+ℹ️  Replay from manifest will create:
+
+  1. Network Rule:   {NW_RULE_NAME}
+  2. Network Policy: {NW_RULE_NAME}_POLICY
+
+IP Sources from manifest:
+  Local IP:       {LOCAL_IP}
+  GitHub Actions: {yes/no}
+  Google Cloud:   {yes/no}
+  Custom CIDRs:   {list}
+
+Proceed with creation? [yes/no]
+
+```
+
+4. **On "yes":** Execute all creation steps without individual confirmations
+5. **Update manifest** progressively as each resource is created
+
+#### Resume Flow (Partial Creation Recovery)
+
+**If manifest shows Status: IN_PROGRESS:**
+
+1. **Read which resources have status `✓`** (already created)
+2. **Display resume info:**
+
+```
+
+ℹ️  Resuming from partial creation:
+
+  ✓ Network Rule:   CREATED
+
+- Network Policy: PENDING
+
+Continue from Network Policy creation? [yes/no]
+
+```
+
+3. **On "yes":** Continue from first `pending` resource
+4. **Update manifest** as each remaining resource is created
 
 **Display success summary to user:**
 
@@ -418,11 +541,11 @@ DROP NETWORK RULE IF EXISTS KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_ACCESS_
 Network Setup Complete!
 
 Resources Created:
-  Network Rule:   KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_ACCESS_RULE
-  Network Policy: HIRC_DUCKDB_DEMO_ACCESS_POLICY
-  CIDRs:          192.168.1.1/32, 10.0.0.0/8
+  Network Rule:   {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME}
+  Network Policy: {NW_RULE_NAME}_POLICY
+  CIDRs:          {count} IP ranges
 
-Manifest appended to: ./snow-utils-manifest.md
+Manifest updated: .snow-utils/snow-utils-manifest.md
 
 ```
 
