@@ -296,7 +296,7 @@ Resources to create:
 USE ROLE <SA_ADMIN_ROLE>;
 CREATE USER IF NOT EXISTS HIRC_DUCKDB_DEMO_RUNNER
     TYPE = SERVICE
-    COMMENT = 'Service user for PAT access';
+    COMMENT = 'HIRC_DUCKDB_DEMO service account - managed by snow-utils-pat';
 GRANT ROLE HIRC_DUCKDB_DEMO_ACCESS TO USER HIRC_DUCKDB_DEMO_RUNNER;
 
 -- Step 2: Create network rule and policy
@@ -305,7 +305,7 @@ CREATE NETWORK RULE KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_
     MODE = INGRESS
     TYPE = IPV4
     VALUE_LIST = ('192.168.1.1/32')
-    COMMENT = 'Created by snow-utils';
+    COMMENT = 'HIRC_DUCKDB_DEMO network rule - managed by snow-utils-pat';
 
 -- Step 3: Create authentication policy
 USE ROLE <SA_ADMIN_ROLE>;
@@ -313,16 +313,31 @@ CREATE SCHEMA IF NOT EXISTS KAMESHS_SNOW_UTILS.POLICIES;
 CREATE OR ALTER AUTHENTICATION POLICY KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY
     AUTHENTICATION_METHODS = ('PROGRAMMATIC_ACCESS_TOKEN')
     PAT_POLICY = (
-        default_expiry_in_days = 30,
-        max_expiry_in_days = 90,
+        default_expiry_in_days = 15,
+        max_expiry_in_days = 365,
         network_policy_evaluation = ENFORCED_REQUIRED
-    );
+    )
+    COMMENT = 'HIRC_DUCKDB_DEMO PAT auth policy - managed by snow-utils-pat';
 
 ALTER USER HIRC_DUCKDB_DEMO_RUNNER SET AUTHENTICATION POLICY KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY;
 
 -- Step 4: Create PAT
 ALTER USER IF EXISTS HIRC_DUCKDB_DEMO_RUNNER ADD PAT HIRC_DUCKDB_DEMO_RUNNER_PAT ROLE_RESTRICTION = HIRC_DUCKDB_DEMO_ACCESS;
 ```
+
+**COMMENT Pattern:** `{DEMO_CONTEXT} {resource_type} - managed by snow-utils-pat`
+
+**Demo Context Inference:**
+
+- Derived from SA_USER by stripping suffixes: `_RUNNER`, `_SA`, `_SERVICE`, `_USER`
+- Example: `HIRC_DUCKDB_DEMO_RUNNER` → `HIRC_DUCKDB_DEMO`
+- Can be overridden via root CLI option: `pat.py --comment "MY_PROJECT" create ...`
+
+This enables:
+
+- Easy identification of resources by demo/project context
+- Filtering resources by skill: `SHOW USERS WHERE COMMENT LIKE '%snow-utils-pat%'`
+- Cleanup discovery across multiple demos
 
 **FORBIDDEN:** Showing only summary without SQL. User MUST see BOTH parts on first display.
 
