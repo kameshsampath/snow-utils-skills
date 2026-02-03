@@ -128,7 +128,7 @@ grep -E "^(SA_ROLE|SA_USER|SNOW_UTILS_DB|SA_PAT)=" .env
 **If SA_ROLE or SNOW_UTILS_DB is empty**, run check_setup.py first:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 ```
 
 **If SA_PAT is empty:**
@@ -320,14 +320,14 @@ Manifest appended to: ./snow-utils-manifest.md
 
 ## Tools
 
-### check_setup.py
+### check_setup.py (from common)
 
 **Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
 
 **Usage:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 ```
 
 **⚠️ DO NOT ADD ANY FLAGS.**
@@ -373,7 +373,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 ## Troubleshooting
 
-**Infrastructure not set up:** Run check_setup.py - it will prompt and offer to create.
+**Infrastructure not set up:** Run `python -m snow_utils_common.check_setup` from common - it will prompt and offer to create.
 
 **Permission denied:** SA_ROLE needs CREATE NETWORK RULE and CREATE NETWORK POLICY privileges.
 

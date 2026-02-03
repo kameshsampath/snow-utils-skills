@@ -403,14 +403,14 @@ Manifest appended to: ./snow-utils-manifest.md
 
 ## Tools
 
-### check_setup.py
+### check_setup.py (from common)
 
 **Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
 
 **Usage:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/check_setup.py
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 ```
 
 **DO NOT ADD ANY FLAGS.**
@@ -460,7 +460,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 ## Troubleshooting
 
-**Infrastructure not set up:** Run check_setup.py - it will prompt and offer to create.
+**Infrastructure not set up:** Run `python -m snow_utils_common.check_setup` from common - it will prompt and offer to create.
 
 **Network policy blocking:** Ensure your IP is in the network rule. Use --local-ip to specify.
 
