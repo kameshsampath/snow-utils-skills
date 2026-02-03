@@ -441,10 +441,16 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 - `--mode, -m`: INGRESS or EGRESS (default: INGRESS)
 - `--values`: Comma-separated CIDRs
 - `--allow-local`: Include auto-detected local IP
-- `--allow-gh, -G`: Include GitHub Actions IPs
+- `--allow-gh, -G`: Include GitHub Actions IPs (IPv4 only - see note below)
 - `--allow-google, -g`: Include Google IPs
 - `--policy, -p`: Also create network policy
 - `--dry-run`: Preview SQL without executing
+
+**⚠️ IPv4-Only Note for GitHub Actions:**
+
+GitHub provides both IPv4 and IPv6 ranges in their meta API, but Snowflake network rules with `TYPE = IPV4` only support IPv4 addresses. The `--allow-gh` flag automatically filters to IPv4 ranges only.
+
+If you need IPv6 support, you would need to create a separate network rule with `TYPE = IPV6` (not currently supported by this skill).
 
 ## Stopping Points
 
