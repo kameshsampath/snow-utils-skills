@@ -216,6 +216,42 @@ PAT Configuration for demo: <DEMO_CONTEXT>
 - `SA_ROLE=<confirmed_value>`
 - `SA_ADMIN_ROLE=<confirmed_value>`
 
+### Step 3.5: Check for Existing PAT
+
+**Check if PAT already exists for the user:**
+
+```bash
+set -a && source .env && set +a && snow sql -q "SHOW USER PATS FOR USER <SA_USER>" --format json
+```
+
+**If PAT exists**, use `ask_user_question` to ask:
+
+| Option | Action |
+|--------|--------|
+| Rotate existing | Use `pat.py rotate` - regenerates token, keeps all policies intact |
+| Remove and recreate | Use `pat.py remove` then `pat.py create` - fresh start with new policies |
+| Cancel | Stop workflow |
+
+**If user chooses "Rotate existing":**
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  rotate --user <SA_USER> --role <SA_ROLE>
+```
+
+Then skip to Step 6 (Verify Connection).
+
+**If user chooses "Remove and recreate":**
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  remove --user <SA_USER> --db <SNOW_UTILS_DB> --yes
+```
+
+Then continue to Step 4.
+
+**If no PAT exists:** Continue to Step 4.
+
 ### Step 4: Preview (Dry Run)
 
 **Execute:**
@@ -446,6 +482,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 - Step 1: If connection checks fail
 - Step 2: If infra check needed (prompts user)
 - Step 3: After gathering requirements
+- Step 3.5: If PAT exists (ask rotate/recreate/cancel)
 - Step 4: After dry-run preview (get approval)
 
 ## Output
