@@ -428,9 +428,49 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 
 **Description:** Creates and manages Snowflake network rules and policies.
 
+**CRITICAL RULES FOR COCO:**
+
+| Rule | Description |
+|------|-------------|
+| **Always confirm** | NEVER execute create, update, or delete without explicit user confirmation |
+| **Show what will happen** | Display SQL preview or summary BEFORE asking for confirmation |
+| **One operation at a time** | Don't chain multiple destructive operations |
+| **Fail fast** | Check prerequisites before running; stop with clear error if not met |
+
+**Pre-Check Rules (Fail Fast):**
+
+| Command | Pre-Check | If Fails |
+|---------|-----------|----------|
+| `rule create` | Rule doesn't exist | Stop: "Rule {name} already exists. Use `update` to modify or `delete` first." |
+| `rule update` | Rule exists | Stop: "Rule {name} not found. Use `create` instead." |
+| `rule delete` | Rule exists | Proceed gracefully (idempotent with IF EXISTS) |
+
+**Command Selection Rules:**
+
+| Scenario | Command | When to Use |
+|----------|---------|-------------|
+| New rule needed | `rule create` | No existing rule, or chose "Remove and recreate" in Step 3.5 |
+| Rule exists, modify IPs | `rule update` | User chose "Update existing" in Step 3.5 |
+| Full cleanup | `rule delete` | User explicitly requests cleanup |
+| List rules | `rule list` | Verify creation or troubleshoot |
+
+**Confirmation Flow:**
+
+1. **create**: Show SQL preview (Step 4) → Ask "Proceed with creation?" → Execute only on "yes"
+2. **update**: Show current vs new IPs → Ask "Update rule with these IPs?" → Execute only on "yes"
+3. **delete**: Show resources to be deleted → Ask "Confirm deletion?" → Execute only on "yes"
+
+**Post-Operation Rules:**
+
+| Command | After Success |
+|---------|---------------|
+| `create` | Add section to `.snow-utils/snow-utils-manifest.md` → Update manifest progressively |
+| `update` | Update manifest with new IP list |
+| `delete` | Remove `snow-utils-networks` section from manifest |
+
 **Command Groups:**
 
-- `rule` - Manage network rules (create, list, delete)
+- `rule` - Manage network rules (create, update, list, delete)
 - `policy` - Manage network policies (create, alter, list, delete)
 
 **Rule Create Options:**
