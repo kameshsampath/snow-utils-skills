@@ -23,6 +23,8 @@ Creates service users, network policies, authentication policies, and Programmat
 
 **⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) to create the SA infrastructure. It requires SA_ADMIN_ROLE (defaults to ACCOUNTADMIN) to create users, network policies, and authentication policies. The output (SA_PAT) is then used by apps/demos to consume resources.
 
+**🔄 IDEMPOTENCY NOTE:** Network rules use `CREATE OR REPLACE` (Snowflake does not support `IF NOT EXISTS` for network rules). Network policies use `CREATE IF NOT EXISTS` to preserve existing policies. Re-running create operations is safe for automation.
+
 **📌 ROLE MODEL:**
 
 - **SA_ADMIN_ROLE** (ACCOUNTADMIN): Creates and owns all objects
@@ -169,7 +171,7 @@ infra_ready: true
 snow_utils_db: <VALUE>
 ```
 
-### Step 2.5: Check SA_ADMIN_ROLE Privileges
+### Step 2a: Check SA_ADMIN_ROLE Privileges
 
 **This skill requires SA_ADMIN_ROLE to have specific privileges. Check BEFORE proceeding.**
 

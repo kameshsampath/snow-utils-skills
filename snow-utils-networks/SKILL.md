@@ -13,6 +13,8 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 **⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) for all object creation. SA_ROLE is a consumer-only role with no CREATE privileges. Uses SA_ADMIN_ROLE (defaults to ACCOUNTADMIN) for privileged operations. After creation, USAGE grants are given to SA_ROLE so apps/demos can use the resources via SA_PAT.
 
+**🔄 IDEMPOTENCY NOTE:** Network rules use `CREATE OR REPLACE` (Snowflake does not support `IF NOT EXISTS` for network rules). Network policies use `CREATE IF NOT EXISTS` to preserve existing policies. Re-running create operations is safe for automation.
+
 **🚫 FORBIDDEN ACTIONS - NEVER DO THESE:**
 
 - NEVER run SQL queries to discover/find/check values (no SHOW ROLES, SHOW DATABASES, SHOW NETWORK RULES)
