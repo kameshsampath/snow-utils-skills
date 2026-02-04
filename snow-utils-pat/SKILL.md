@@ -596,8 +596,8 @@ USE ROLE {SA_ADMIN_ROLE};
 ALTER USER {SA_USER} REMOVE PAT {SA_USER}_PAT;
 -- 2. Unassign auth policy (MUST do before drop)
 ALTER USER {SA_USER} UNSET AUTHENTICATION POLICY;
--- 3. Unassign network policy
-ALTER USER {SA_USER} UNSET NETWORK POLICY;
+-- 3. Unassign network policy (MUST do before drop)
+ALTER USER {SA_USER} UNSET NETWORK_POLICY;
 -- 4. Drop user (now safe - no policy dependencies)
 DROP USER IF EXISTS {SA_USER};
 -- 5. Drop auth policy
