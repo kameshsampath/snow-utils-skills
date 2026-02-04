@@ -79,8 +79,13 @@ def infer_comment_prefix(user: str) -> str:
 
 
 def get_service_user_sql(user: str, pat_role: str, comment_prefix: str) -> str:
-    """Generate SQL for creating service user (idempotent)."""
+    """Generate SQL for creating service user and role (idempotent)."""
     return f"""USE ROLE accountadmin;
+-- Create PAT role if not exists
+CREATE ROLE IF NOT EXISTS {pat_role}
+    COMMENT = '{comment_prefix} PAT access role - managed by snow-utils-pat';
+GRANT ROLE {pat_role} TO ROLE SYSADMIN;
+-- Create service user
 CREATE USER IF NOT EXISTS {user}
     TYPE = SERVICE
     COMMENT = '{comment_prefix} service account - managed by snow-utils-pat';
@@ -88,14 +93,20 @@ GRANT ROLE {pat_role} TO USER {user};"""
 
 
 def setup_service_user(user: str, pat_role: str, comment_prefix: str) -> None:
-    """Create service user and grant the PAT role (idempotent)."""
-    click.echo(f"Setting up service user: {user}")
+    """Create PAT role (if needed) and service user, then grant role (idempotent)."""
+    click.echo(f"Setting up PAT role and service user: {user}")
     sql = get_service_user_sql(user, pat_role, comment_prefix)
     run_snow_sql_stdin(sql)
-    click.echo(f"✓ Service user {user} configured with role {pat_role}")
+    click.echo(f"✓ Role {pat_role} and service user {user} configured")
 
 
-def get_auth_policy_sql(user: str, db: str, default_expiry_days: int, max_expiry_days: int, comment_prefix: str) -> str:
+def get_auth_policy_sql(
+    user: str,
+    db: str,
+    default_expiry_days: int,
+    max_expiry_days: int,
+    comment_prefix: str,
+) -> str:
     """Generate SQL for creating authentication policy (idempotent)."""
     auth_policy_name = f"{user}_auth_policy".upper()
 
@@ -112,10 +123,18 @@ CREATE OR ALTER AUTHENTICATION POLICY {db}.POLICIES.{auth_policy_name}
 ALTER USER {user} SET AUTHENTICATION POLICY {db}.POLICIES.{auth_policy_name};"""
 
 
-def setup_auth_policy(user: str, db: str, default_expiry_days: int, max_expiry_days: int, comment_prefix: str) -> None:
+def setup_auth_policy(
+    user: str,
+    db: str,
+    default_expiry_days: int,
+    max_expiry_days: int,
+    comment_prefix: str,
+) -> None:
     """Create authentication policy for PAT access (idempotent)."""
     click.echo("Setting up authentication policy...")
-    sql = get_auth_policy_sql(user, db, default_expiry_days, max_expiry_days, comment_prefix)
+    sql = get_auth_policy_sql(
+        user, db, default_expiry_days, max_expiry_days, comment_prefix
+    )
     run_snow_sql_stdin(sql)
     click.echo("✓ Authentication policy configured")
 
@@ -151,10 +170,14 @@ def get_existing_pat(user: str, pat_name: str) -> str | None:
 
 def get_pat_sql(user: str, pat_role: str, pat_name: str) -> str:
     """Generate SQL for creating PAT."""
-    return f"ALTER USER IF EXISTS {user} ADD PAT {pat_name} ROLE_RESTRICTION = {pat_role};"
+    return (
+        f"ALTER USER IF EXISTS {user} ADD PAT {pat_name} ROLE_RESTRICTION = {pat_role};"
+    )
 
 
-def create_or_rotate_pat(user: str, pat_role: str, pat_name: str, rotate: bool = False) -> str:
+def create_or_rotate_pat(
+    user: str, pat_role: str, pat_name: str, rotate: bool = False
+) -> str:
     """Create a new PAT or rotate an existing one (idempotent for rotate=True)."""
     existing = get_existing_pat(user, pat_name)
 
@@ -169,7 +192,9 @@ def create_or_rotate_pat(user: str, pat_role: str, pat_name: str, rotate: bool =
         click.echo(f"Rotating PAT for service user {user}...")
         query = f"ALTER USER IF EXISTS {user} ROTATE PAT {pat_name}"
     else:
-        click.echo(f"Creating new PAT for service user {user} with role restriction {pat_role}...")
+        click.echo(
+            f"Creating new PAT for service user {user} with role restriction {pat_role}..."
+        )
         query = f"ALTER USER IF EXISTS {user} ADD PAT {pat_name} ROLE_RESTRICTION = {pat_role}"
 
     result = run_snow_sql(query)
@@ -229,7 +254,9 @@ def update_env(env_path: Path, user: str, password: str, pat_role: str) -> None:
     password_replacement = f"SNOWFLAKE_PASSWORD={_escape_env_value(password)}"
 
     if re.search(password_pattern, content, re.MULTILINE):
-        new_content = re.sub(password_pattern, password_replacement, content, flags=re.MULTILINE)
+        new_content = re.sub(
+            password_pattern, password_replacement, content, flags=re.MULTILINE
+        )
     else:
         new_content = content.rstrip() + f"\n{password_replacement}\n"
 
@@ -237,7 +264,9 @@ def update_env(env_path: Path, user: str, password: str, pat_role: str) -> None:
     user_replacement = f"SA_USER={_escape_env_value(user)}"
 
     if re.search(user_pattern, new_content, re.MULTILINE):
-        new_content = re.sub(user_pattern, user_replacement, new_content, flags=re.MULTILINE)
+        new_content = re.sub(
+            user_pattern, user_replacement, new_content, flags=re.MULTILINE
+        )
     else:
         new_content = new_content.rstrip() + f"\n{user_replacement}\n"
 
@@ -245,12 +274,16 @@ def update_env(env_path: Path, user: str, password: str, pat_role: str) -> None:
     role_replacement = f"SA_ROLE={_escape_env_value(pat_role)}"
 
     if re.search(role_pattern, new_content, re.MULTILINE):
-        new_content = re.sub(role_pattern, role_replacement, new_content, flags=re.MULTILINE)
+        new_content = re.sub(
+            role_pattern, role_replacement, new_content, flags=re.MULTILINE
+        )
     else:
         new_content = new_content.rstrip() + f"\n{role_replacement}\n"
 
     env_path.write_text(new_content)
-    click.echo(f"✓ Updated {env_path} with new SNOWFLAKE_PASSWORD, SA_USER, and SA_ROLE")
+    click.echo(
+        f"✓ Updated {env_path} with new SNOWFLAKE_PASSWORD, SA_USER, and SA_ROLE"
+    )
 
 
 def clear_env(env_path: Path) -> None:
@@ -266,7 +299,9 @@ def clear_env(env_path: Path) -> None:
     click.echo(f"✓ Created backup: {backup_path}")
 
     password_pattern = r"^SNOWFLAKE_PASSWORD=.*$"
-    new_content = re.sub(password_pattern, 'SNOWFLAKE_PASSWORD=""', content, flags=re.MULTILINE)
+    new_content = re.sub(
+        password_pattern, 'SNOWFLAKE_PASSWORD=""', content, flags=re.MULTILINE
+    )
 
     env_path.write_text(new_content)
     click.echo(f"✓ Cleared SNOWFLAKE_PASSWORD in {env_path}")
@@ -343,11 +378,21 @@ def cli(ctx: click.Context, verbose: bool, debug: bool, comment: str | None) -> 
 
 
 @cli.command(name="create")
-@click.option("--user", "-u", envvar="SA_USER", required=True, help="Service account user name")
-@click.option("--role", "-r", envvar="SA_ROLE", required=True, help="Role restriction for the PAT")
-@click.option("--db", "-d", envvar="SNOW_UTILS_DB", required=True, help="Database for PAT objects")
-@click.option("--pat-name", default=None, envvar="PAT_NAME", help="Name for the PAT token")
-@click.option("--rotate/--no-rotate", default=True, help="Rotate existing PAT (default: True)")
+@click.option(
+    "--user", "-u", envvar="SA_USER", required=True, help="Service account user name"
+)
+@click.option(
+    "--role", "-r", envvar="SA_ROLE", required=True, help="Role restriction for the PAT"
+)
+@click.option(
+    "--db", "-d", envvar="SNOW_UTILS_DB", required=True, help="Database for PAT objects"
+)
+@click.option(
+    "--pat-name", default=None, envvar="PAT_NAME", help="Name for the PAT token"
+)
+@click.option(
+    "--rotate/--no-rotate", default=True, help="Rotate existing PAT (default: True)"
+)
 @click.option(
     "--env-path",
     type=click.Path(path_type=Path),
@@ -361,11 +406,23 @@ def cli(ctx: click.Context, verbose: bool, debug: bool, comment: str | None) -> 
     default=True,
     help="Include local IP (default: True)",
 )
-@click.option("--allow-gh", is_flag=True, default=False, help="Include GitHub Actions IPs")
+@click.option(
+    "--allow-gh", is_flag=True, default=False, help="Include GitHub Actions IPs"
+)
 @click.option("--allow-google", is_flag=True, default=False, help="Include Google IPs")
 @click.option("--extra-cidrs", multiple=True, help="Additional CIDRs (can be repeated)")
-@click.option("--default-expiry-days", default=15, type=int, help="Default PAT expiry days (Snowflake default: 15)")
-@click.option("--max-expiry-days", default=365, type=int, help="Maximum PAT expiry days (Snowflake default: 365)")
+@click.option(
+    "--default-expiry-days",
+    default=15,
+    type=int,
+    help="Default PAT expiry days (Snowflake default: 15)",
+)
+@click.option(
+    "--max-expiry-days",
+    default=365,
+    type=int,
+    help="Maximum PAT expiry days (Snowflake default: 365)",
+)
 @click.option("--dry-run", is_flag=True, help="Preview without making changes")
 @click.option(
     "--force",
@@ -489,10 +546,22 @@ def create_command(
         click.echo(get_service_user_sql(user, role, comment_prefix))
         click.echo()
         click.echo("-- Step 2: Create network rule and policy")
-        click.echo(get_setup_network_for_user_sql(user=user, db=db, cidrs=cidrs, force=force, comment_prefix=comment_prefix))
+        click.echo(
+            get_setup_network_for_user_sql(
+                user=user,
+                db=db,
+                cidrs=cidrs,
+                force=force,
+                comment_prefix=comment_prefix,
+            )
+        )
         click.echo()
         click.echo("-- Step 3: Create authentication policy")
-        click.echo(get_auth_policy_sql(user, db, default_expiry_days, max_expiry_days, comment_prefix))
+        click.echo(
+            get_auth_policy_sql(
+                user, db, default_expiry_days, max_expiry_days, comment_prefix
+            )
+        )
         click.echo()
         click.echo("-- Step 4: Create PAT")
         click.echo(get_pat_sql(user, role, pat_name))
@@ -502,7 +571,9 @@ def create_command(
     setup_service_user(user=user, pat_role=role, comment_prefix=comment_prefix)
 
     click.echo(f"Setting up network rule and policy ({len(cidrs)} CIDRs)...")
-    rule_fqn, policy_name = setup_network_for_user(user=user, db=db, cidrs=cidrs, force=force, comment_prefix=comment_prefix)
+    rule_fqn, policy_name = setup_network_for_user(
+        user=user, db=db, cidrs=cidrs, force=force, comment_prefix=comment_prefix
+    )
     click.echo(f"✓ Network rule: {rule_fqn}")
     click.echo(f"✓ Network policy: {policy_name}")
     assign_network_policy_to_user(user, policy_name)
@@ -516,7 +587,9 @@ def create_command(
         comment_prefix=comment_prefix,
     )
 
-    password = create_or_rotate_pat(user=user, pat_role=role, pat_name=pat_name, rotate=rotate)
+    password = create_or_rotate_pat(
+        user=user, pat_role=role, pat_name=pat_name, rotate=rotate
+    )
 
     if output == "text":
         update_env(env_path=env_path, user=user, password=password, pat_role=role)
@@ -538,9 +611,15 @@ def create_command(
 
 
 @cli.command(name="remove")
-@click.option("--user", "-u", envvar="SA_USER", required=True, help="Service account user name")
-@click.option("--db", "-d", envvar="SNOW_UTILS_DB", required=True, help="Database for PAT objects")
-@click.option("--pat-name", default=None, envvar="PAT_NAME", help="Name of the PAT to remove")
+@click.option(
+    "--user", "-u", envvar="SA_USER", required=True, help="Service account user name"
+)
+@click.option(
+    "--db", "-d", envvar="SNOW_UTILS_DB", required=True, help="Database for PAT objects"
+)
+@click.option(
+    "--pat-name", default=None, envvar="PAT_NAME", help="Name of the PAT to remove"
+)
 @click.option("--drop-user", is_flag=True, help="Also drop the service user")
 @click.option("--pat-only", is_flag=True, help="Only remove PAT, keep policies")
 @click.option(
@@ -621,15 +700,26 @@ def remove_command(
 
 
 @cli.command(name="rotate")
-@click.option("--user", "-u", required=True, envvar="SA_USER", help="Service account user name")
-@click.option("--role", "-r", required=True, envvar="SA_ROLE", help="Role restriction for the PAT")
+@click.option(
+    "--user", "-u", required=True, envvar="SA_USER", help="Service account user name"
+)
+@click.option(
+    "--role", "-r", required=True, envvar="SA_ROLE", help="Role restriction for the PAT"
+)
 @click.option("--pat-name", envvar="SA_PAT", help="Name for the PAT token")
 @click.option(
-    "--env-path", type=click.Path(path_type=Path), default=Path(".env"), help=".env file path"
+    "--env-path",
+    type=click.Path(path_type=Path),
+    default=Path(".env"),
+    help=".env file path",
 )
 @click.option("--skip-verify", is_flag=True, help="Skip connection verification")
 @click.option(
-    "-o", "--output", type=click.Choice(["text", "json"]), default="text", help="Output format"
+    "-o",
+    "--output",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format",
 )
 def rotate_command(
     user: str,
@@ -670,7 +760,9 @@ def rotate_command(
             f"PAT '{pat_name}' not found for user {user}. Use 'create' command first."
         )
 
-    password = create_or_rotate_pat(user=user, pat_role=role, pat_name=pat_name, rotate=True)
+    password = create_or_rotate_pat(
+        user=user, pat_role=role, pat_name=pat_name, rotate=True
+    )
 
     if output == "text":
         update_env(env_path=env_path, user=user, password=password, pat_role=role)
@@ -695,9 +787,13 @@ def rotate_command(
 
 
 @cli.command(name="verify")
-@click.option("--user", "-u", required=True, envvar="SA_USER", help="Service account user name")
+@click.option(
+    "--user", "-u", required=True, envvar="SA_USER", help="Service account user name"
+)
 @click.option("--role", "-r", required=True, envvar="SA_ROLE", help="Role for the PAT")
-@click.option("--password", "-p", envvar="SA_PAT", help="PAT token (or use SA_PAT env var)")
+@click.option(
+    "--password", "-p", envvar="SA_PAT", help="PAT token (or use SA_PAT env var)"
+)
 @click.option(
     "--env-path",
     type=click.Path(path_type=Path),
@@ -733,7 +829,9 @@ def verify_command(
             import re
 
             match = re.search(
-                r'^SNOWFLAKE_PASSWORD\s*=\s*["\']?([^"\'#\n]+)["\']?', content, re.MULTILINE
+                r'^SNOWFLAKE_PASSWORD\s*=\s*["\']?([^"\'#\n]+)["\']?',
+                content,
+                re.MULTILINE,
             )
             if match:
                 password = match.group(1).strip()
