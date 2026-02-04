@@ -470,6 +470,16 @@ ALTER USER IF EXISTS HIRC_DUCKDB_DEMO_RUNNER ADD PAT HIRC_DUCKDB_DEMO_RUNNER_PAT
 - Example: `HIRC_DUCKDB_DEMO_RUNNER` → `HIRC_DUCKDB_DEMO`
 - Can be overridden via root CLI option: `pat.py --comment "MY_PROJECT" create ...`
 
+> **⚠️ CRITICAL:** `--comment` is a GLOBAL option - it MUST come BEFORE the subcommand!
+>
+> ```bash
+> # ✅ CORRECT - global option before subcommand
+> pat.py --comment "MY_PROJECT" create --user ${SA_USER} ...
+> 
+> # ❌ WRONG - will fail with "No such option"
+> pat.py create --user ${SA_USER} --comment "MY_PROJECT" ...
+> ```
+
 This enables:
 
 - Easy identification of resources by demo/project context
