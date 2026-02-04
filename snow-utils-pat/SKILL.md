@@ -281,9 +281,9 @@ Both SA_ROLE and service user should use user-prefixed demo context for consiste
 Use `ask_user_question`:
 
 ```
-Service Account Naming:
+💡 Service Account Naming
 
-💡 TIP: User prefix recommended for shared accounts to avoid collisions.
+Using a user prefix is recommended for shared accounts to avoid collisions.
 
 ☑ Use prefix: KAMESHS_MYAPP_RUNNER (recommended)
 ☐ No prefix: MYAPP_RUNNER
@@ -335,7 +335,7 @@ PAT Expiry Profile:
 - `SA_ROLE=<confirmed_value>`
 - `SA_ADMIN_ROLE=<confirmed_value>`
 
-### Step 3.5: Check for Existing PAT
+### Step 3a: Check for Existing PAT
 
 **Check if PAT already exists for the user:**
 
@@ -468,7 +468,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 **On failure:** Present error and remediation steps.
 
-### Step 5.5: Secure .env File
+### Step 5a: Secure .env File
 
 **Set restrictive permissions on .env to protect the PAT token:**
 
@@ -747,8 +747,8 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 
 | Scenario | Command | When to Use |
 |----------|---------|-------------|
-| New PAT needed | `create` | User has no existing PAT, or chose "Remove and recreate" in Step 3.5 |
-| PAT exists, refresh token | `rotate` | User chose "Rotate existing" in Step 3.5 - keeps all policies |
+| New PAT needed | `create` | User has no existing PAT, or chose "Remove and recreate" in Step 3a |
+| PAT exists, refresh token | `rotate` | User chose "Rotate existing" in Step 3a - keeps all policies |
 | Full cleanup | `remove` | User explicitly requests cleanup, or "Remove and recreate" before create |
 | Test connection | `verify` | After create or rotate to confirm PAT works |
 
@@ -860,7 +860,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 - Step 1: If connection checks fail
 - Step 2: If infra check needed (prompts user)
 - Step 3: After gathering requirements
-- Step 3.5: If PAT exists (ask rotate/recreate/cancel)
+- Step 3a: If PAT exists (ask rotate/recreate/cancel)
 - Step 4: After dry-run preview (get approval)
 
 ## Output
