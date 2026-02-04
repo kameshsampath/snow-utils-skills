@@ -591,6 +591,9 @@ This manifest records all Snowflake resources created by snow-utils skills.
 
 **Created:** {TIMESTAMP}
 **User:** {SA_USER}
+**Role:** {SA_ROLE}
+**Database:** {SNOW_UTILS_DB}
+**Comment:** {COMMENT_PREFIX}
 **Status:** COMPLETE
 
 | # | Type | Name | Location | Status |
@@ -674,6 +677,8 @@ This enables recovery if CoCo loses context mid-creation.
 **Created:** {TIMESTAMP}
 **User:** {SA_USER}
 **Role:** {SA_ROLE}
+**Database:** {SNOW_UTILS_DB}
+**Comment:** {COMMENT_PREFIX}
 **Status:** IN_PROGRESS
 
 ### Resources (creation order)
@@ -699,6 +704,8 @@ This enables recovery if CoCo loses context mid-creation.
 **Created:** {TIMESTAMP}
 **User:** {SA_USER}
 **Role:** {SA_ROLE}
+**Database:** {SNOW_UTILS_DB}
+**Comment:** {COMMENT_PREFIX}
 **Status:** COMPLETE
 
 ### Resources (creation order)
@@ -822,35 +829,67 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 > **Why preserve manifest?** The manifest serves as audit trail and reference for recreating resources.
 > User can manually delete if no longer needed.
 
-#### Replay Flow (Single Confirmation)
+#### Replay Flow (Minimal Approvals)
+
+> **🚨 GOAL:** Replay is for less technical users who trust the setup. Minimize friction.
+> CoCo constructs summary from manifest (no dry-run needed), gets ONE confirmation, then executes.
+
+**Trigger phrases:** "replay manifest", "replay from manifest", "recreate from manifest", "replay PAT"
+
+> **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (hidden directory - use exact path)
 
 **If user asks to replay/recreate from manifest:**
 
-1. **Read manifest** `.snow-utils/snow-utils-manifest.md`
+1. **Read manifest** using exact path `.snow-utils/snow-utils-manifest.md`:
+
+   ```bash
+   cat .snow-utils/snow-utils-manifest.md
+   ```
+
 2. **Find section** `<!-- START -- snow-utils-pat -->`
-3. **Display info summary with single confirmation:**
+
+3. **Check Status field and act accordingly:**
+
+| Status | Action |
+|--------|--------|
+| `REMOVED` | Proceed with creation (resources don't exist) |
+| `COMPLETE` | Warn: "Resources already exist. Run 'remove' first or choose 'recreate' to cleanup and recreate." |
+| `IN_PROGRESS` | Use Resume Flow instead (partial creation) |
+
+1. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
+
+2. **If Status is `REMOVED`**, extract values and display summary:
 
 ```
-
 ℹ️  Replay from manifest will create:
 
-  1. Network Rule:   {SA_USER}_NETWORK_RULE
-  2. Network Policy: {SA_USER}_NETWORK_POLICY  
-  3. Auth Policy:    {SA_USER}_AUTH_POLICY
-  4. Service User:   {SA_USER}
-  5. PAT:            {SA_USER}_PAT
+  Resources:
+    • Network Rule:   {SA_USER}_NETWORK_RULE
+    • Network Policy: {SA_USER}_NETWORK_POLICY
+    • Auth Policy:    {SA_USER}_AUTH_POLICY
+    • Service User:   {SA_USER}
+    • PAT:            {SA_USER}_PAT
 
-Using values from manifest:
-  User: {SA_USER}
-  Role: {SA_ROLE}
-  Database: {SNOW_UTILS_DB}
+  Configuration:
+    User:     {SA_USER}
+    Role:     {SA_ROLE}
+    Database: {SNOW_UTILS_DB}
+    Comment:  {COMMENT_PREFIX}
 
 Proceed with creation? [yes/no]
-
 ```
 
-1. **On "yes":** Execute all creation steps without individual confirmations
-2. **Update manifest** progressively as each resource is created
+1. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  --comment "{COMMENT_PREFIX}" create --user {SA_USER} --role {SA_ROLE} --db {SNOW_UTILS_DB}
+```
+
+- CLI shows progress for each step automatically
+- **NO additional user prompts until complete**
+
+1. **Update manifest** status back to `COMPLETE` after successful creation
 
 #### Resume Flow (Partial Creation Recovery)
 
