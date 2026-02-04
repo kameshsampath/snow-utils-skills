@@ -223,6 +223,7 @@ def rule_delete_cmd(..., output: str):
 ```
 
 **Affected commands:**
+
 - `network.py rule delete`
 - `network.py policy delete`
 - `pat.py remove`
