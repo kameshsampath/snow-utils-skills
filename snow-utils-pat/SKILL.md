@@ -462,7 +462,29 @@ This enables:
 
 **STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 
-### Step 5: Create Resources
+### Step 5a: Create Network Resources
+
+> **Dependency Note:** Network rule and policy must exist before PAT can be used.
+> If this step fails, do NOT proceed to Step 5b.
+
+**Execute:**
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --output json --dry-run 2>&1 | head -20
+```
+
+This creates:
+1. **Network Rule**: `{SA_USER}_NETWORK_RULE` in `{SNOW_UTILS_DB}.NETWORKS`
+2. **Network Policy**: `{SA_USER}_NETWORK_POLICY` (account-level)
+
+**On success:** Update manifest with network resources (✓), proceed to Step 5b.
+
+**On failure:** Present error and remediation steps. Do NOT proceed to Step 5b.
+
+### Step 5b: Create PAT Resources
+
+> **Dependency:** Requires Step 5a (Network) to complete successfully.
 
 **Execute:**
 
@@ -470,6 +492,12 @@ This enables:
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --output json
 ```
+
+This creates:
+1. **Service Role**: `{SA_ROLE}` (e.g., `{PROJECT}_ACCESS`)
+2. **Service User**: `{SA_USER}` (e.g., `{PROJECT}_RUNNER`)
+3. **Auth Policy**: `{SA_USER}_AUTH_POLICY` in `{SNOW_UTILS_DB}.POLICIES`
+4. **PAT**: `{SA_USER}_PAT` attached to service user
 
 **On success:**
 
@@ -479,7 +507,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 **On failure:** Present error and remediation steps.
 
-### Step 5a: Secure .env File
+### Step 5c: Secure .env File
 
 **Set restrictive permissions on .env to protect the PAT token:**
 
