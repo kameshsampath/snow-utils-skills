@@ -337,9 +337,16 @@ def list_network_policies(admin_role: str = "accountadmin") -> list[dict]:
 
 
 def network_policy_exists(policy_name: str, admin_role: str = "accountadmin") -> bool:
-    """Check if a network policy exists."""
-    policies = list_network_policies(admin_role=admin_role)
-    return any(p.get("name", "").upper() == policy_name.upper() for p in policies)
+    """Check if a network policy exists by trying to describe it directly.
+
+    Uses exact name lookup instead of listing all policies to avoid
+    privilege errors on policies we don't own.
+    """
+    try:
+        result = run_snow_sql(f"DESC NETWORK POLICY {policy_name}", role=admin_role)
+        return result is not None and len(result) > 0
+    except Exception:
+        return False
 
 
 def get_policies_for_rule(
@@ -958,6 +965,25 @@ def policy_list_cmd(admin_role: str) -> None:
     for p in policies:
         name = p.get("name", "N/A")
         click.echo(f"  {name}")
+
+
+@policy.command(name="assign")
+@click.option("--name", "-n", required=True, help="Network policy name")
+@click.option("--user", "-u", required=True, help="User to assign policy to")
+@click.option(
+    "--admin-role",
+    "-a",
+    envvar="SA_ADMIN_ROLE",
+    default="accountadmin",
+    help="Admin role for assignment",
+)
+def policy_assign_cmd(name: str, user: str, admin_role: str) -> None:
+    """Assign a network policy to a user."""
+    policy_upper = name.upper()
+    user_upper = user.upper()
+    click.echo(f"Assigning policy {policy_upper} to user {user_upper}...")
+    assign_network_policy_to_user(user_upper, policy_upper, admin_role=admin_role)
+    click.echo(f"✓ Assigned {policy_upper} to {user_upper}")
 
 
 if __name__ == "__main__":

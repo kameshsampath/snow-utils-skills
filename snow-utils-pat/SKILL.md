@@ -496,6 +496,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../snow-utils-ne
 ```
 
 **CLI shows progress:**
+
 - ✓ Network rule created
 - ✓ Network policy created
 
@@ -517,6 +518,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 ```
 
 **CLI shows progress:**
+
 - ✓ Role and user configured
 - ✓ Auth policy created
 - ✓ PAT created
