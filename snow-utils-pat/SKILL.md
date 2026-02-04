@@ -193,7 +193,7 @@ grep -E "^SA_ADMIN_ROLE=" .env | cut -d= -f2
 **If SA_ADMIN_ROLE is set to a custom role**, verify it has required privileges:
 
 ```bash
-set -a && source .env && set +a && snow sql -q "
+set -a && source .env && set +a && snow sql --role ${SA_ADMIN_ROLE:-ACCOUNTADMIN} -q "
 SHOW GRANTS TO ROLE <SA_ADMIN_ROLE>;
 " --format json
 ```
@@ -337,11 +337,13 @@ PAT Expiry Profile:
 
 ### Step 3a: Check for Existing PAT
 
-**Check if PAT already exists for the user:**
+**Check if PAT already exists for the user (using elevated role):**
 
 ```bash
-set -a && source .env && set +a && snow sql -q "SHOW USER PATS FOR USER <SA_USER>" --format json
+set -a && source .env && set +a && snow sql --role ${SA_ADMIN_ROLE:-ACCOUNTADMIN} -q "SHOW USER PATS FOR USER <SA_USER>" --format json
 ```
+
+> ⚠️ **IMPORTANT:** All account-level operations from this step onwards MUST use `--role ${SA_ADMIN_ROLE:-ACCOUNTADMIN}` to ensure proper privileges.
 
 **If PAT exists**, use `ask_user_question` to ask:
 
@@ -380,9 +382,12 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --dry-run
 ```
 
-**CRITICAL: SHOW BOTH SUMMARY AND FULL SQL**
+**🔴 CRITICAL: ALWAYS SHOW SUMMARY + FULL SQL**
 
-After running dry-run, display output in TWO parts:
+> This is MANDATORY on EVERY display - even after pause/resume, context restart, or re-confirmation.
+> **FORBIDDEN:** Showing only summary. User MUST see BOTH parts EVERY time.
+
+**Template (ALWAYS use this exact structure):**
 
 **Part 1 - Resource Summary (brief):**
 
@@ -447,7 +452,10 @@ This enables:
 - Filtering resources by skill: `SHOW USERS WHERE COMMENT LIKE '%snow-utils-pat%'`
 - Cleanup discovery across multiple demos
 
-**FORBIDDEN:** Showing only summary without SQL. User MUST see BOTH parts on first display.
+**❌ WRONG:** Showing only summary table.
+**✅ RIGHT:** Summary table + Full SQL block together.
+
+> 🔄 **On pause/resume:** Re-display this SAME summary + SQL before asking for confirmation again.
 
 **STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 
