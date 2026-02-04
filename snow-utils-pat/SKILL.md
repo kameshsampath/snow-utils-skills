@@ -16,8 +16,10 @@ Creates service users, network policies, authentication policies, and Programmat
 - NEVER use flags that bypass user interaction: `--yes`, `-y`, `--auto-setup`, `--auto-approve`, `--quiet`, `--force`, `--non-interactive`
 - NEVER assume user consent - always ask and wait for explicit confirmation
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
-- NEVER display PAT tokens in diffs, logs, or output - always mask as `***REDACTED***`
+- **NEVER display PAT tokens in diffs, logs, or ANY output** - always mask as `***REDACTED***`
+- **NEVER show .env file contents after PAT is written** - use redacted placeholder
 - **NEVER run raw SQL for cleanup** - ALWAYS use `pat.py remove` command (handles dependency order automatically)
+- **NEVER create resources without showing SQL and getting confirmation first**
 - If .env values are empty, prompt user or run check_setup.py
 
 **INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
@@ -467,11 +469,40 @@ This enables:
 > **Dependency Note:** Network rule and policy must exist before PAT can be used.
 > If this step fails, do NOT proceed to Step 5b.
 
-**Execute:**
+**First, show the SQL that will be executed:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --output json --dry-run 2>&1 | head -20
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
+  rule create --name <SA_USER>_NETWORK_RULE --db <SNOW_UTILS_DB> --schema NETWORKS --dry-run
+```
+
+**Display the Network Rule and Policy SQL to user:**
+
+```sql
+-- Network Rule
+USE ROLE <SA_ADMIN_ROLE>;
+CREATE OR REPLACE NETWORK RULE <SNOW_UTILS_DB>.NETWORKS.<SA_USER>_NETWORK_RULE
+    MODE = INGRESS
+    TYPE = IPV4
+    VALUE_LIST = ('<LOCAL_IP>/32')
+    COMMENT = '<DEMO_CONTEXT> network rule - managed by snow-utils-pat';
+
+-- Network Policy
+CREATE NETWORK POLICY IF NOT EXISTS <SA_USER>_NETWORK_POLICY
+    ALLOWED_NETWORK_RULE_LIST = ('<SNOW_UTILS_DB>.NETWORKS.<SA_USER>_NETWORK_RULE')
+    COMMENT = '<DEMO_CONTEXT> network policy - managed by snow-utils-pat';
+
+-- Attach to user
+ALTER USER <SA_USER> SET NETWORK_POLICY = <SA_USER>_NETWORK_POLICY;
+```
+
+**🛑 STOP**: Ask user to confirm network resource creation before proceeding.
+
+**On user confirmation, execute:**
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
+  rule create --name <SA_USER>_NETWORK_RULE --db <SNOW_UTILS_DB> --schema NETWORKS --output json
 ```
 
 This creates:
@@ -501,29 +532,40 @@ This creates:
 3. **Auth Policy**: `{SA_USER}_AUTH_POLICY` in `{SNOW_UTILS_DB}.POLICIES`
 4. **PAT**: `{SA_USER}_PAT` attached to service user
 
-**On success:**
+**On success, the script outputs JSON with the PAT token.**
 
-- Token is written to .env as SA_PAT
-- Show connection verification result
-- **Write cleanup manifest** (see Step 7)
+Proceed to Step 5c to update .env.
 
 **On failure:** Present error and remediation steps.
 
-### Step 5c: Secure .env File
+### Step 5c: Update .env with PAT and Secure
 
-**Set restrictive permissions on .env to protect the PAT token:**
+> **CRITICAL:** This step MUST update .env with the PAT token, then secure the file.
+
+**1. Update .env with the PAT token (single-quoted for safe parsing):**
+
+```bash
+# Extract PAT from script output or use the token value
+# Use single quotes to handle special characters in PAT
+sed -i '' "s/^SA_PAT=.*/SA_PAT='<PAT_TOKEN_VALUE>'/" .env
+```
+
+**2. Set restrictive permissions AFTER updating:**
 
 ```bash
 chmod 600 .env
 ```
 
-**Verify permissions:**
+**3. Verify permissions:**
 
 ```bash
 ls -la .env | grep -E "^-rw-------"
 ```
 
-This ensures only the file owner can read/write the .env file containing the sensitive PAT.
+**🔒 Security Notes:**
+- Single quotes around PAT prevent shell interpretation of special characters
+- chmod 600 ensures only the file owner can read/write
+- NEVER display the actual PAT value - always show `***REDACTED***`
 
 ### Step 6: Verify Connection (MANDATORY)
 
@@ -791,20 +833,40 @@ Manifest updated: .snow-utils/snow-utils-manifest.md
 
 ## PAT Security
 
-**NEVER display PAT tokens in:**
+**🚨 CRITICAL: NEVER display PAT tokens in ANY output:**
 
-- Diff output
+- Diff output (use `***REDACTED***` placeholder)
 - Log messages
-- Console output (except initial creation confirmation)
+- Console output
 - Summary displays
+- Error messages
+- Debug output
 
 **Always mask as:** `***REDACTED***`
 
-**When showing .env changes:**
+**When showing .env changes (MANDATORY redaction):**
 
 ```diff
-+ SA_PAT=***REDACTED***
+# ❌ WRONG - NEVER show actual token
++ SA_PAT='ver:1-hint:12345-secret:abcdef...'
+
+# ✅ CORRECT - Always redact
++ SA_PAT='***REDACTED***'
 ```
+
+**When updating .env programmatically:**
+
+```bash
+# Use single quotes to handle special characters in PAT
+sed -i '' "s/^SA_PAT=.*/SA_PAT='<TOKEN>'/" .env
+
+# NEVER echo/cat the .env file after adding PAT
+# NEVER use `git diff` that shows .env contents with PAT
+```
+
+**If you accidentally display a PAT:**
+1. Immediately inform the user
+2. Recommend rotating the PAT: `pat.py rotate --user <SA_USER> --role <SA_ROLE>`
 
 ## Tools
 
