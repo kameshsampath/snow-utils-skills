@@ -17,6 +17,7 @@ Creates service users, network policies, authentication policies, and Programmat
 - NEVER assume user consent - always ask and wait for explicit confirmation
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
 - NEVER display PAT tokens in diffs, logs, or output - always mask as `***REDACTED***`
+- **NEVER run raw SQL for cleanup** - ALWAYS use `pat.py remove` command (handles dependency order automatically)
 - If .env values are empty, prompt user or run check_setup.py
 
 **INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
@@ -588,7 +589,23 @@ This enables recovery if CoCo loses context mid-creation.
 | 4 | Service User | {SA_USER} | Account | ✓ |
 | 5 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | ✓ |
 
-### Cleanup Instructions (dependency order - reverse of creation)
+### Cleanup Instructions
+
+> **🚨 CRITICAL: ALWAYS USE CLI COMMAND FOR CLEANUP**
+>
+> The CLI command handles dependency order, syntax, and error recovery automatically.
+> **NEVER run raw SQL for cleanup** - use the script command below.
+
+#### CLI Cleanup (REQUIRED)
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user {SA_USER} --db {SNOW_UTILS_DB} --drop-user
+```
+
+#### SQL Reference (FALLBACK ONLY - if CLI unavailable)
+
+<details>
+<summary>Manual SQL cleanup (dependency order - reverse of creation)</summary>
 
 ```sql
 USE ROLE {SA_ADMIN_ROLE};
@@ -596,34 +613,36 @@ USE ROLE {SA_ADMIN_ROLE};
 ALTER USER {SA_USER} REMOVE PAT {SA_USER}_PAT;
 -- 2. Unassign auth policy (MUST do before drop)
 ALTER USER {SA_USER} UNSET AUTHENTICATION POLICY;
--- 3. Unassign network policy (MUST do before drop)
+-- 3. Unassign network policy (MUST do before drop) - NOTE: underscore required!
 ALTER USER {SA_USER} UNSET NETWORK_POLICY;
 -- 4. Drop user (now safe - no policy dependencies)
 DROP USER IF EXISTS {SA_USER};
 -- 5. Drop auth policy
 DROP AUTHENTICATION POLICY IF EXISTS {SNOW_UTILS_DB}.POLICIES.{SA_USER}_AUTH_POLICY;
--- 6. Drop network policy
+-- 6. Drop network policy (frees the rule)
 DROP NETWORK POLICY IF EXISTS {SA_USER}_NETWORK_POLICY;
 -- 7. Drop network rule (last - policy depended on it)
 DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 ```
 
-### CLI Cleanup
-
-```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user {SA_USER} --db {SNOW_UTILS_DB}
-```
+</details>
 <!-- END -- snow-utils-pat -->
 ```
 
 #### Remove Flow (Reads Manifest First)
 
+> **🚨 CRITICAL: ALWAYS use `pat.py remove` command - NEVER run raw SQL for cleanup.**
+> The CLI command handles dependency order, proper syntax (e.g., `NETWORK_POLICY` with underscore), and error recovery.
+
 **On `remove` command:**
 
 1. **Check manifest exists:** `.snow-utils/snow-utils-manifest.md`
 2. **If exists:** Read `<!-- START -- snow-utils-pat -->` section for exact resource names
-3. **Use manifest values** for cleanup instead of inferring from naming convention
-4. **After cleanup success:** Remove the `<!-- START -- snow-utils-pat -->` to `<!-- END -- snow-utils-pat -->` section
+3. **Run CLI cleanup command:**
+   ```bash
+   set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user {SA_USER} --db {SNOW_UTILS_DB} --drop-user
+   ```
+4. **After cleanup success:** Remove the `<!-- START -- snow-utils-pat -->` to `<!-- END -- snow-utils-pat -->` section from manifest
 5. **If manifest becomes empty** (only header): Optionally delete the file
 
 #### Replay Flow (Single Confirmation)
@@ -893,7 +912,9 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 **Connection verification failed:** Check network policy allows your IP.
 
-**Cannot drop database (policy attached):** Use `snow-utils-manifest.md` cleanup commands in order, or run `pat.py remove`.
+**Cannot drop database (policy attached):** Run `pat.py remove --drop-user` - it handles dependency order automatically. **NEVER run raw SQL for cleanup.**
+
+**Cannot drop network rule (associated with policies):** Run `pat.py remove` - it detaches rules from policies before dropping. **NEVER run raw SQL for cleanup.**
 
 ## Security Notes
 
