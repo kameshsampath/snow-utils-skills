@@ -22,6 +22,7 @@ Creates and manages network rules and policies for IP-based access control in Sn
 - NEVER use flags that bypass user interaction: `--yes`, `-y`, `--auto-setup`, `--auto-approve`, `--quiet`, `--force`, `--non-interactive`
 - NEVER assume user consent - always ask and wait for explicit confirmation
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
+- **NEVER run raw SQL for cleanup** - ALWAYS use CLI commands (handles dependency order and detach/reattach)
 - If .env values are empty, prompt user or run check_setup.py
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
@@ -532,7 +533,23 @@ CoCo can use this manifest to replay creation or cleanup resources.
 | Google Cloud | {yes/no} |
 | Custom CIDRs | {list or none} |
 
-### Cleanup Instructions (dependency order)
+### Cleanup Instructions
+
+> **🚨 CRITICAL: ALWAYS USE CLI COMMAND FOR CLEANUP**
+>
+> The CLI command handles dependency order and detach/reattach for rules attached to policies.
+> **NEVER run raw SQL for cleanup** - use the script command below.
+
+#### CLI Cleanup (REQUIRED)
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py rule delete --name {NW_RULE_NAME} --db {NW_RULE_DB}
+```
+
+#### SQL Reference (FALLBACK ONLY - if CLI unavailable)
+
+<details>
+<summary>Manual SQL cleanup (dependency order)</summary>
 
 ```sql
 USE ROLE {SA_ADMIN_ROLE};
@@ -542,23 +559,56 @@ DROP NETWORK POLICY IF EXISTS {NW_RULE_NAME}_POLICY;
 DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 ```
 
-### CLI Cleanup
-
-```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py rule delete --name {NW_RULE_NAME} --db {NW_RULE_DB}
-```
+</details>
 <!-- END -- snow-utils-networks -->
 ```
 
-#### Remove Flow (Reads Manifest First)
+#### Remove Flow (Manifest-Driven Cleanup)
 
-**On `rule delete` command:**
+> **🚨 CRITICAL: Cleanup MUST be driven by the manifest.**
+> 
+> The manifest contains the exact CLI command to run. NEVER construct cleanup SQL manually.
 
-1. **Check manifest exists:** `.snow-utils/snow-utils-manifest.md`
-2. **If exists:** Read `<!-- START -- snow-utils-networks -->` section for exact resource names
-3. **Use manifest values** for cleanup instead of inferring from naming convention
-4. **After cleanup success:** Remove the `<!-- START -- snow-utils-networks -->` to `<!-- END -- snow-utils-networks -->` section
-5. **If manifest becomes empty** (only header): Optionally delete the file
+**On `remove` / `cleanup` / `delete` request:**
+
+1. **Check manifest exists:**
+   ```bash
+   cat .snow-utils/snow-utils-manifest.md 2>/dev/null || echo "NOT_FOUND"
+   ```
+
+2. **If manifest NOT_FOUND:**
+   - Inform user: "No manifest found. Cannot determine resources to clean up."
+   - Ask: "Do you want to specify cleanup parameters manually?"
+   - If yes, ask for NW_RULE_NAME and NW_RULE_DB values
+
+3. **If manifest EXISTS:**
+   - Read the `<!-- START -- snow-utils-networks -->` to `<!-- END -- snow-utils-networks -->` section
+   - Find the **"CLI Cleanup (REQUIRED)"** section in manifest
+   - **Execute the command exactly as written in the manifest**
+
+4. **Before executing, show user:**
+   ```
+   🗑️  Cleanup from manifest:
+   
+   Will remove resources:
+     Network Rule:   {NW_RULE_NAME}
+     Network Policy: {NW_RULE_NAME}_POLICY
+   
+   Using command from manifest:
+   
+   <CLI command from manifest>
+   
+   Proceed? [yes/no]
+   ```
+
+5. **On confirmation:** Execute the CLI command from manifest
+
+6. **After cleanup success:** 
+   - Remove the `<!-- START -- snow-utils-networks -->` to `<!-- END -- snow-utils-networks -->` section from manifest
+   - If manifest becomes empty (only header): Optionally delete the file
+
+> **Why manifest-driven?** The manifest captures exact resource names created during setup.
+> Using CLI ensures proper dependency order, syntax, and error handling.
 
 #### Replay Flow (Single Confirmation)
 

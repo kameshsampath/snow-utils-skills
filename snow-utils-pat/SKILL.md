@@ -629,21 +629,62 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 <!-- END -- snow-utils-pat -->
 ```
 
-#### Remove Flow (Reads Manifest First)
+#### Remove Flow (Manifest-Driven Cleanup)
 
-> **🚨 CRITICAL: ALWAYS use `pat.py remove` command - NEVER run raw SQL for cleanup.**
-> The CLI command handles dependency order, proper syntax (e.g., `NETWORK_POLICY` with underscore), and error recovery.
+> **🚨 CRITICAL: Cleanup MUST be driven by the manifest.**
+>
+> The manifest contains the exact CLI command to run. NEVER construct cleanup SQL manually.
 
-**On `remove` command:**
+**On `remove` / `cleanup` / `delete` request:**
 
-1. **Check manifest exists:** `.snow-utils/snow-utils-manifest.md`
-2. **If exists:** Read `<!-- START -- snow-utils-pat -->` section for exact resource names
-3. **Run CLI cleanup command:**
+1. **Check manifest exists:**
+
    ```bash
-   set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user {SA_USER} --db {SNOW_UTILS_DB} --drop-user
+   cat .snow-utils/snow-utils-manifest.md 2>/dev/null || echo "NOT_FOUND"
    ```
-4. **After cleanup success:** Remove the `<!-- START -- snow-utils-pat -->` to `<!-- END -- snow-utils-pat -->` section from manifest
-5. **If manifest becomes empty** (only header): Optionally delete the file
+
+2. **If manifest NOT_FOUND:**
+   - Inform user: "No manifest found. Cannot determine resources to clean up."
+   - Ask: "Do you want to specify cleanup parameters manually?"
+   - If yes, ask for SA_USER and SNOW_UTILS_DB values
+
+3. **If manifest EXISTS:**
+   - Read the `<!-- START -- snow-utils-pat -->` to `<!-- END -- snow-utils-pat -->` section
+   - Find the **"CLI Cleanup (REQUIRED)"** section in manifest
+   - **Execute the command exactly as written in the manifest**
+
+   Example manifest excerpt:
+
+   ```markdown
+   #### CLI Cleanup (REQUIRED)
+   
+   ```bash
+   set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user KAMESHS_PAT_DEMO_RUNNER --db KAMESHS_SNOW_UTILS --drop-user
+   ```
+
+   ```
+
+4. **Before executing, show user:**
+
+   ```
+   🗑️  Cleanup from manifest:
+   
+   Will remove resources for: {SA_USER}
+   Using command from manifest:
+   
+   <CLI command from manifest>
+   
+   Proceed? [yes/no]
+   ```
+
+5. **On confirmation:** Execute the CLI command from manifest
+
+6. **After cleanup success:**
+   - Remove the `<!-- START -- snow-utils-pat -->` to `<!-- END -- snow-utils-pat -->` section from manifest
+   - If manifest becomes empty (only header): Optionally delete the file
+
+> **Why manifest-driven?** The manifest captures exact resource names created during setup.
+> Using CLI ensures proper dependency order, syntax, and error handling.
 
 #### Replay Flow (Single Confirmation)
 
@@ -672,8 +713,8 @@ Proceed with creation? [yes/no]
 
 ```
 
-4. **On "yes":** Execute all creation steps without individual confirmations
-5. **Update manifest** progressively as each resource is created
+1. **On "yes":** Execute all creation steps without individual confirmations
+2. **Update manifest** progressively as each resource is created
 
 #### Resume Flow (Partial Creation Recovery)
 
@@ -697,8 +738,8 @@ Continue from Auth Policy creation? [yes/no]
 
 ```
 
-3. **On "yes":** Continue from first `pending` resource
-4. **Update manifest** as each remaining resource is created
+1. **On "yes":** Continue from first `pending` resource
+2. **Update manifest** as each remaining resource is created
 
 **Display success summary to user:**
 
@@ -721,6 +762,7 @@ Manifest updated: .snow-utils/snow-utils-manifest.md
 ## PAT Security
 
 **NEVER display PAT tokens in:**
+
 - Diff output
 - Log messages
 - Console output (except initial creation confirmation)
@@ -729,6 +771,7 @@ Manifest updated: .snow-utils/snow-utils-manifest.md
 **Always mask as:** `***REDACTED***`
 
 **When showing .env changes:**
+
 ```diff
 + SA_PAT=***REDACTED***
 ```
