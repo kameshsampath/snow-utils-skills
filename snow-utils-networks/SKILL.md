@@ -566,12 +566,13 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 #### Remove Flow (Manifest-Driven Cleanup)
 
 > **🚨 CRITICAL: Cleanup MUST be driven by the manifest.**
-> 
+>
 > The manifest contains the exact CLI command to run. NEVER construct cleanup SQL manually.
 
 **On `remove` / `cleanup` / `delete` request:**
 
 1. **Check manifest exists:**
+
    ```bash
    cat .snow-utils/snow-utils-manifest.md 2>/dev/null || echo "NOT_FOUND"
    ```
@@ -587,6 +588,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
    - **Execute the command exactly as written in the manifest**
 
 4. **Before executing, show user:**
+
    ```
    🗑️  Cleanup from manifest:
    
@@ -603,7 +605,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
 5. **On confirmation:** Execute the CLI command from manifest
 
-6. **After cleanup success:** 
+6. **After cleanup success:**
    - Remove the `<!-- START -- snow-utils-networks -->` to `<!-- END -- snow-utils-networks -->` section from manifest
    - If manifest becomes empty (only header): Optionally delete the file
 
@@ -635,8 +637,8 @@ Proceed with creation? [yes/no]
 
 ```
 
-4. **On "yes":** Execute all creation steps without individual confirmations
-5. **Update manifest** progressively as each resource is created
+1. **On "yes":** Execute all creation steps without individual confirmations
+2. **Update manifest** progressively as each resource is created
 
 #### Resume Flow (Partial Creation Recovery)
 
@@ -657,8 +659,8 @@ Continue from Network Policy creation? [yes/no]
 
 ```
 
-3. **On "yes":** Continue from first `pending` resource
-4. **Update manifest** as each remaining resource is created
+1. **On "yes":** Continue from first `pending` resource
+2. **Update manifest** as each remaining resource is created
 
 **Display success summary to user:**
 
