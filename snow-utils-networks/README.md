@@ -1,6 +1,8 @@
-# snow-utils-networks
+# Snowflake Network Rules & Policies
 
 Create and manage Snowflake network rules and policies for IP-based access control.
+
+> **Skill ID:** `snow-utils-networks`
 
 ## Installation
 

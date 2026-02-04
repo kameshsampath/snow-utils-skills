@@ -622,6 +622,10 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
 #### Replay Flow (Single Confirmation)
 
+**Trigger phrases:** "replay manifest", "replay from manifest", "recreate from manifest", "replay network", "replay network setup"
+
+> **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (hidden directory - use exact path)
+
 **If user asks to replay/recreate from manifest:**
 
 1. **Read manifest** `.snow-utils/snow-utils-manifest.md`
@@ -634,7 +638,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 | `COMPLETE` | Warn: "Resources already exist. Run 'remove' first or choose 'recreate'" |
 | `IN_PROGRESS` | Use Resume Flow instead (partial creation) |
 
-1. **Display info summary with single confirmation:**
+4. **Display info summary with single confirmation:**
 
 ```
 

@@ -1,6 +1,8 @@
-# snow-utils-volumes
+# Snowflake External Volumes for Iceberg
 
 Create and manage Snowflake external volumes for Iceberg tables with cloud storage.
+
+> **Skill ID:** `snow-utils-volumes`
 
 ## Installation
 

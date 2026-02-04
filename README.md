@@ -1,6 +1,8 @@
-# snow-utils-skills
+# Snowflake Infrastructure Skills for Cortex Code
 
 [Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code) skills for Snowflake infrastructure automation.
+
+> **Repository:** `snow-utils-skills`
 
 ## What is this?
 

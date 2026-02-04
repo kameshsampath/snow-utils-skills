@@ -1,6 +1,8 @@
-# snow-utils-pat
+# Snowflake Programmatic Access Tokens (PAT)
 
-Create and manage Snowflake Programmatic Access Tokens (PATs) for service accounts.
+Create and manage Snowflake Programmatic Access Tokens for service accounts.
+
+> **Skill ID:** `snow-utils-pat`
 
 ## Installation
 
