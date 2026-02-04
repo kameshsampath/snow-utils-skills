@@ -314,10 +314,11 @@ Example: 10.0.0.0/8, 192.168.1.0/24
 
 ### Step 3.5: Check for Existing Network Rule
 
-**Check if network rule already exists:**
+**Check if network rule already exists (use exact name, never wildcards):**
 
 ```bash
-set -a && source .env && set +a && snow sql -q "SHOW NETWORK RULES LIKE '<NW_RULE_NAME>' IN SCHEMA <NW_RULE_DB>.<NW_RULE_SCHEMA>" --format json
+# Use DESC for exact name lookup - avoids privilege issues with other resources
+set -a && source .env && set +a && snow sql -q "DESC NETWORK RULE <NW_RULE_DB>.<NW_RULE_SCHEMA>.<NW_RULE_NAME>" --format json
 ```
 
 **If rule exists**, use `ask_user_question` to ask:

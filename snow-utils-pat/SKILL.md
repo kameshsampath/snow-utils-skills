@@ -429,9 +429,9 @@ CREATE SCHEMA IF NOT EXISTS KAMESHS_SNOW_UTILS.POLICIES;
 CREATE OR ALTER AUTHENTICATION POLICY KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY
     AUTHENTICATION_METHODS = ('PROGRAMMATIC_ACCESS_TOKEN')
     PAT_POLICY = (
-        default_expiry_in_days = 15,
-        max_expiry_in_days = 365,
-        network_policy_evaluation = ENFORCED_REQUIRED
+        DEFAULT_EXPIRY_IN_DAYS = 15
+        MAX_EXPIRY_IN_DAYS = 365
+        NETWORK_POLICY_EVALUATION = ENFORCED_REQUIRED
     )
     COMMENT = 'HIRC_DUCKDB_DEMO PAT auth policy - managed by snow-utils-pat';
 
@@ -475,6 +475,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 ```
 
 This creates:
+
 1. **Network Rule**: `{SA_USER}_NETWORK_RULE` in `{SNOW_UTILS_DB}.NETWORKS`
 2. **Network Policy**: `{SA_USER}_NETWORK_POLICY` (account-level)
 
@@ -494,6 +495,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 ```
 
 This creates:
+
 1. **Service Role**: `{SA_ROLE}` (e.g., `{PROJECT}_ACCESS`)
 2. **Service User**: `{SA_USER}` (e.g., `{PROJECT}_RUNNER`)
 3. **Auth Policy**: `{SA_USER}_AUTH_POLICY` in `{SNOW_UTILS_DB}.POLICIES`
