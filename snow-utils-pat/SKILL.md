@@ -517,12 +517,13 @@ This creates:
 ### Step 5b: Create PAT Resources
 
 > **Dependency:** Requires Step 5a (Network) to complete successfully.
+> Network creation is delegated to snow-utils-networks skill, so we use `--skip-network`.
 
 **Execute:**
 
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --output json
+  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --skip-network --output json
 ```
 
 This creates:
@@ -531,6 +532,8 @@ This creates:
 2. **Service User**: `{SA_USER}` (e.g., `{PROJECT}_RUNNER`)
 3. **Auth Policy**: `{SA_USER}_AUTH_POLICY` in `{SNOW_UTILS_DB}.POLICIES`
 4. **PAT**: `{SA_USER}_PAT` attached to service user
+
+> **Note:** `--skip-network` tells pat.py that network resources were created in Step 5a by snow-utils-networks skill.
 
 **On success, the script outputs JSON with the PAT token.**
 
@@ -563,6 +566,7 @@ ls -la .env | grep -E "^-rw-------"
 ```
 
 **🔒 Security Notes:**
+
 - Single quotes around PAT prevent shell interpretation of special characters
 - chmod 600 ensures only the file owner can read/write
 - NEVER display the actual PAT value - always show `***REDACTED***`
@@ -865,6 +869,7 @@ sed -i '' "s/^SA_PAT=.*/SA_PAT='<TOKEN>'/" .env
 ```
 
 **If you accidentally display a PAT:**
+
 1. Immediately inform the user
 2. Recommend rotating the PAT: `pat.py rotate --user <SA_USER> --role <SA_ROLE>`
 
