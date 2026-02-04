@@ -2,6 +2,12 @@
 
 Create and manage Snowflake external volumes for Iceberg tables with cloud storage.
 
+## Installation
+
+```bash
+cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-volumes
+```
+
 ## Features
 
 - **S3 Integration** - Create external volumes backed by AWS S3
@@ -76,11 +82,15 @@ Create and manage Snowflake external volumes for Iceberg tables with cloud stora
 
 ## AWS Setup
 
-The skill generates the IAM trust policy automatically. You'll need to:
+> [!IMPORTANT]
+> The skill generates the IAM trust policy, but you need to create the IAM role in AWS.
 
 1. Create the IAM role in AWS
 2. Attach the generated trust policy
 3. Grant S3 access to the bucket
+
+> [!TIP]
+> The skill displays the exact IAM policy JSON. Copy it directly into the AWS console.
 
 ## See Also
 

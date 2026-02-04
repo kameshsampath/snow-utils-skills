@@ -6,6 +6,9 @@
 
 A collection of skills that enable natural language automation of common Snowflake infrastructure tasks. Ask Cortex Code to create service accounts, network rules, or external volumes - it handles the complexity.
 
+> [!NOTE]
+> This repository contains the **skills** (SKILL.md + scripts). The source code is maintained in [snow-utils](https://github.com/kameshsampath/snow-utils).
+
 ## Skills
 
 | Skill | Description | Sample Prompts |
@@ -13,6 +16,20 @@ A collection of skills that enable natural language automation of common Snowfla
 | [snow-utils-pat](./snow-utils-pat/) | Service account PAT creation | "Create a PAT for service account", "Rotate my PAT" |
 | [snow-utils-networks](./snow-utils-networks/) | Network rules & policies | "Create network rule for my IP", "Allow GitHub Actions" |
 | [snow-utils-volumes](./snow-utils-volumes/) | External volumes for Iceberg | "Create external volume for S3" |
+
+## Installation
+
+Add skills to your Cortex Code instance:
+
+```bash
+# Add all skills
+cortex skill add https://github.com/kameshsampath/snow-utils-skills
+
+# Or add individual skills
+cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-pat
+cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-networks
+cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-volumes
+```
 
 ## Quick Start
 
@@ -43,18 +60,49 @@ Open Cortex Code and try:
 "Set up an external volume for S3"
 ```
 
-## Features
+## Design Principles
 
-- **Natural Language Interface** - Describe what you want, skills handle the details
-- **Interactive Workflows** - Prompts for confirmation at each step
-- **Manifest Tracking** - All resources recorded for replay, audit, and cleanup
-- **Idempotent Operations** - Safe to re-run without side effects
-- **Smart Detection** - Skills share configuration when used together
+These skills follow [12-factor app](https://12factor.net/) principles:
 
-## Documentation
+### Environment-Based Configuration
 
-- [Cortex Code Documentation](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code)
-- [Snowflake CLI Documentation](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index)
+All configuration via environment variables in `.env`:
+
+```bash
+SNOWFLAKE_DEFAULT_CONNECTION_NAME=myconn
+SA_ADMIN_ROLE=ACCOUNTADMIN
+SNOW_UTILS_DB=MY_UTILS_DB
+```
+
+> [!TIP]
+> Skills auto-detect shared configuration. Run PAT skill first, and Networks skill will detect `SA_ADMIN_ROLE` automatically.
+
+### Manifest-Driven Operations
+
+All resources are tracked in `.snow-utils/snow-utils-manifest.md`:
+
+| Operation | How it works |
+|-----------|--------------|
+| **Create** | Records resources with status `COMPLETE` |
+| **Cleanup** | Sets status to `REMOVED` (preserves history) |
+| **Replay** | Reads manifest, recreates resources |
+| **Resume** | Continues from `IN_PROGRESS` state |
+| **Audit** | Review what was created and when |
+
+> [!IMPORTANT]
+> The manifest is the source of truth. Don't edit it manually.
+
+### Idempotent Operations
+
+- `CREATE OR REPLACE` for network rules
+- `CREATE IF NOT EXISTS` for policies
+- Safe to re-run without side effects
+
+### Interactive by Default
+
+- Every destructive operation requires explicit confirmation
+- Dry-run preview before execution
+- Clear prompts with sensible defaults
 
 ## Project Structure
 
@@ -76,6 +124,15 @@ snow-utils-skills/
 ├── TESTING.md                # Test cases for all skills
 └── TODO.md                   # v2 roadmap
 ```
+
+## Documentation
+
+- [Cortex Code Documentation](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code)
+- [Snowflake CLI Documentation](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index)
+
+## Related
+
+- [snow-utils](https://github.com/kameshsampath/snow-utils) - Source repository with core scripts
 
 ## License
 

@@ -2,6 +2,12 @@
 
 Create and manage Snowflake Programmatic Access Tokens (PATs) for service accounts.
 
+## Installation
+
+```bash
+cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-pat
+```
+
 ## Features
 
 - **Service Account Creation** - Create dedicated users for automation
@@ -80,10 +86,16 @@ Create and manage Snowflake Programmatic Access Tokens (PATs) for service accoun
 
 ## Security Notes
 
+> [!CAUTION]
+> PAT tokens are sensitive credentials. Never commit them to version control.
+
 - PAT tokens are never displayed in logs or diffs
 - Network policies restrict access to specified IPs only
 - Authentication policy prevents password-based login
 - Tokens should be stored securely (environment variables, secrets manager)
+
+> [!TIP]
+> Use the manifest to track which resources were created. Run `"Remove my service account"` for clean teardown.
 
 ## See Also
 

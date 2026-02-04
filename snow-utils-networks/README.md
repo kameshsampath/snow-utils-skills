@@ -2,6 +2,12 @@
 
 Create and manage Snowflake network rules and policies for IP-based access control.
 
+## Installation
+
+```bash
+cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-networks
+```
+
 ## Features
 
 - **Local IP Detection** - Automatically detect your current IP for development access
@@ -70,10 +76,25 @@ Create and manage Snowflake network rules and policies for IP-based access contr
 | `NW_RULE_DB` | Database for network rules | (prompted) |
 | `NW_RULE_SCHEMA` | Schema for network rules | NETWORKS |
 
+> [!TIP]
+> If you've already run the PAT skill, Networks will detect `SA_ADMIN_ROLE` and offer to reuse it for `NW_ADMIN_ROLE`.
+
 ## Resources Created
 
 - **Network Rule** - IP allowlist with MODE=INGRESS, TYPE=IPV4
 - **Network Policy** - References the network rule for user assignment
+
+## IP Sources
+
+| Source | Flag | Description |
+|--------|------|-------------|
+| Local IP | `--allow-local` | Auto-detected current IP |
+| GitHub Actions | `--allow-gh` | GitHub Actions runner IPs (IPv4 only) |
+| Google Cloud | `--allow-google` | GCP service IPs |
+| Custom | `--values` | Your own CIDR ranges |
+
+> [!NOTE]
+> GitHub Actions provides both IPv4 and IPv6 ranges. Only IPv4 is used since Snowflake network rules with `TYPE=IPV4` don't support IPv6.
 
 ## See Also
 
