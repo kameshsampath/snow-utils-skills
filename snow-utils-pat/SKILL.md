@@ -22,6 +22,25 @@ Creates service users, network policies, authentication policies, and Programmat
 - **NEVER create resources without showing SQL and getting confirmation first**
 - If .env values are empty, prompt user or run check_setup.py
 
+**Writing Sensitive Values (SA_PAT):**
+
+When about to write/edit a sensitive value like `SA_PAT`:
+
+1. **DO NOT show diff** - diffs expose the sensitive value being written
+2. **Show message before write:**
+
+   ```
+   📝 Writing sensitive value to .env (diff hidden to protect sensitive data)
+   
+   Confirm write? [y/N]
+   ```
+
+3. **After write, show REDACTED confirmation:**
+
+   ```
+   ✓ Updated .env: SA_PAT='***REDACTED***'
+   ```
+
 **INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
 **⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) to create the SA infrastructure. It requires SA_ADMIN_ROLE (defaults to ACCOUNTADMIN) to create users, network policies, and authentication policies. The output (SA_PAT) is then used by apps/demos to consume resources.
@@ -469,14 +488,14 @@ This enables:
 > **Dependency Note:** Network rule and policy must exist before PAT can be used.
 > If this step fails, do NOT proceed to Step 5b.
 
-**First, show the SQL that will be executed:**
+**🛑 STOP - Confirm Network Resource Creation:**
 
-```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
-  rule create --name <SA_USER>_NETWORK_RULE --db <SNOW_UTILS_DB> --schema NETWORKS --dry-run
-```
+| Resource | Name | Location |
+|----------|------|----------|
+| Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS |
+| Network Policy | {SA_USER}_NETWORK_POLICY | Account-level |
 
-**Display the Network Rule and Policy SQL to user:**
+**SQL Preview:**
 
 ```sql
 -- Network Rule
@@ -491,39 +510,57 @@ CREATE OR REPLACE NETWORK RULE <SNOW_UTILS_DB>.NETWORKS.<SA_USER>_NETWORK_RULE
 CREATE NETWORK POLICY IF NOT EXISTS <SA_USER>_NETWORK_POLICY
     ALLOWED_NETWORK_RULE_LIST = ('<SNOW_UTILS_DB>.NETWORKS.<SA_USER>_NETWORK_RULE')
     COMMENT = '<DEMO_CONTEXT> network policy - managed by snow-utils-pat';
-
--- Attach to user
-ALTER USER <SA_USER> SET NETWORK_POLICY = <SA_USER>_NETWORK_POLICY;
 ```
 
-**🛑 STOP**: Ask user to confirm network resource creation before proceeding.
+> **Note:** Policy assignment to user happens after Step 5b creates the user.
+
+**Ask:** "Proceed with network resource creation?"
 
 **On user confirmation, execute:**
 
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
-  rule create --name <SA_USER>_NETWORK_RULE --db <SNOW_UTILS_DB> --schema NETWORKS --output json
+  rule create --name <SA_USER>_NETWORK_RULE --db <SNOW_UTILS_DB> --schema NETWORKS \
+  --policy <SA_USER>_NETWORK_POLICY --output json
 ```
 
-This creates:
+**On success, write manifest immediately:**
 
-1. **Network Rule**: `{SA_USER}_NETWORK_RULE` in `{SNOW_UTILS_DB}.NETWORKS`
-2. **Network Policy**: `{SA_USER}_NETWORK_POLICY` (account-level)
+```bash
+mkdir -p .snow-utils
+```
 
-**On success:**
+**Write to `.snow-utils/snow-utils-manifest.md`:**
 
-1. **Initialize manifest** (if first resource):
-   ```bash
-   mkdir -p .snow-utils
-   ```
-   Create `.snow-utils/snow-utils-manifest.md` with header and IN_PROGRESS section (see Step 7 for format).
+```markdown
+# Snow-Utils Manifest
 
-2. **Update manifest** - mark network resources as ✓:
-   - Network Rule: ✓
-   - Network Policy: ✓
-   - Remaining resources: pending
+This manifest records all Snowflake resources created by snow-utils skills.
+Each skill section is bounded by START/END markers for easy identification.
+CoCo uses this manifest to track, audit, and cleanup resources.
 
-3. Proceed to Step 5b.
+---
+
+<!-- START -- snow-utils-pat -->
+## PAT Resources: {COMMENT_PREFIX}
+
+**Created:** {TIMESTAMP}
+**User:** {SA_USER}
+**Status:** IN_PROGRESS
+
+| # | Type | Name | Location | Status |
+|---|------|------|----------|--------|
+| 1 | Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS | ✓ |
+| 2 | Network Policy | {SA_USER}_NETWORK_POLICY | Account | ✓ |
+| 3 | Policy Assignment | → {SA_USER} | Account | pending |
+| 4 | Service Role | {SA_ROLE} | Account | pending |
+| 5 | Service User | {SA_USER} | Account | pending |
+| 6 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | pending |
+| 7 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | pending |
+<!-- END -- snow-utils-pat -->
+```
+
+Proceed to Step 5b.
 
 **On failure:** Present error and remediation steps. Do NOT proceed to Step 5b.
 
@@ -532,65 +569,90 @@ This creates:
 > **Dependency:** Requires Step 5a (Network) to complete successfully.
 > Network creation is delegated to snow-utils-networks skill, so we use `--skip-network`.
 
-**Execute:**
+**🛑 STOP - Confirm PAT Resource Creation:**
+
+| Resource | Name | Location |
+|----------|------|----------|
+| Service Role | {SA_ROLE} | Account-level |
+| Service User | {SA_USER} | Account-level |
+| Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES |
+| PAT | {SA_USER}_PAT | Attached to {SA_USER} |
+
+**Ask:** "Proceed with PAT resource creation?"
+
+**On user confirmation, execute:**
 
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --skip-network --output json
 ```
 
-This creates:
+> **Note:** `--skip-network` tells pat.py that network resources were created in Step 5a.
 
-1. **Service Role**: `{SA_ROLE}` (e.g., `{PROJECT}_ACCESS`)
-2. **Service User**: `{SA_USER}` (e.g., `{PROJECT}_RUNNER`)
-3. **Auth Policy**: `{SA_USER}_AUTH_POLICY` in `{SNOW_UTILS_DB}.POLICIES`
-4. **PAT**: `{SA_USER}_PAT` attached to service user
+**On success:**
 
-> **Note:** `--skip-network` tells pat.py that network resources were created in Step 5a by snow-utils-networks skill.
+1. **Assign network policy to user** (now that user exists):
 
-**On success, the script outputs JSON with the PAT token.**
+   ```bash
+   set -a && source .env && set +a && uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
+     policy assign --name <SA_USER>_NETWORK_POLICY --user <SA_USER>
+   ```
 
-1. **Update manifest** - mark PAT resources as ✓:
-   - Service Role: ✓
-   - Service User: ✓
-   - Auth Policy: ✓
-   - PAT: ✓
+2. **Update manifest** - change rows 3-7 from `pending` to `✓`:
 
-2. Proceed to Step 5c to update .env.
+   ```markdown
+   | 3 | Policy Assignment | → {SA_USER} | Account | ✓ |
+   | 4 | Service Role | {SA_ROLE} | Account | ✓ |
+   | 5 | Service User | {SA_USER} | Account | ✓ |
+   | 6 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | ✓ |
+   | 7 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | ✓ |
+   ```
+
+3. Proceed to Step 5c to update .env.
 
 **On failure:** Present error and remediation steps.
 
 ### Step 5c: Update .env with PAT and Secure
 
-> **CRITICAL:** This step MUST update .env with the PAT token, then secure the file.
+> **CRITICAL:** This step updates .env with the PAT token, then secures the file.
 
-**1. Update .env with the PAT token (single-quoted for safe parsing):**
+**🛑 STOP - Confirm .env Update:**
 
-```bash
-# Extract PAT from script output or use the token value
-# Use single quotes to handle special characters in PAT
-sed -i '' "s/^SA_PAT=.*/SA_PAT='<PAT_TOKEN_VALUE>'/" .env
-```
+| Action | Details |
+|--------|---------|
+| Update SA_PAT | SA_PAT='***REDACTED***' |
+| Set permissions | chmod 600 (owner read/write only) |
 
-**2. Set restrictive permissions AFTER updating:**
+> 📝 Writing sensitive value - diff hidden to protect sensitive data.
 
-```bash
-chmod 600 .env
-```
+**Ask:** "Proceed with .env update?"
 
-**3. Verify permissions:**
+**On user confirmation:**
 
-```bash
-ls -la .env | grep -E "^-rw-------"
-```
+1. **Update .env with the PAT token (single-quoted for safe parsing):**
 
-**4. Update manifest status to COMPLETE** (all resources now created).
+   ```bash
+   # Use single quotes to handle special characters in PAT
+   sed -i '' "s/^SA_PAT=.*/SA_PAT='<PAT_TOKEN_VALUE>'/" .env
+   ```
 
-**🔒 Security Notes:**
+2. **Set restrictive permissions:**
 
-- Single quotes around PAT prevent shell interpretation of special characters
-- chmod 600 ensures only the file owner can read/write
-- NEVER display the actual PAT value - always show `***REDACTED***`
+   ```bash
+   chmod 600 .env
+   ```
+
+3. **Show REDACTED confirmation (NOT the actual value):**
+
+   ```
+   ✓ .env updated:
+     - SA_PAT='***REDACTED***'
+     - Permissions: -rw------- (600)
+   ```
+
+4. **Update manifest status to COMPLETE:**
+
+   Change `**Status:** IN_PROGRESS` to `**Status:** COMPLETE` in `.snow-utils/snow-utils-manifest.md`
 
 ### Step 6: Verify Connection (MANDATORY)
 
