@@ -87,6 +87,45 @@ All resources are tracked in `.snow-utils/snow-utils-manifest.md`:
 | **Resume** | Continues from `IN_PROGRESS` state |
 | **Audit** | Review what was created and when |
 
+#### Manifest Format
+
+Each resource gets a unique section with markers:
+
+```markdown
+<!-- START -- snow-utils-pat:MYAPP_RUNNER -->
+## PAT: MYAPP_RUNNER
+
+| Field | Value |
+|-------|-------|
+| User | MYAPP_RUNNER |
+| PAT Name | MYAPP_RUNNER_PAT |
+| Expires | 2026-05-04 |
+| Status | COMPLETE |
+<!-- END -- snow-utils-pat:MYAPP_RUNNER -->
+
+<!-- START -- snow-utils-networks:MYAPP_LOCAL -->
+## Network Rule: MYAPP_LOCAL
+
+| Field | Value |
+|-------|-------|
+| Rule | MYAPP_LOCAL_ACCESS |
+| Policy | MYAPP_LOCAL_POLICY |
+| Status | REMOVED |
+<!-- END -- snow-utils-networks:MYAPP_LOCAL -->
+```
+
+#### Operation Flow
+
+| Operation | Before | After | Trigger Phrases |
+|-----------|--------|-------|-----------------|
+| **Create** | (no section) | Section with `COMPLETE` | "create PAT", "create network rule" |
+| **Cleanup** | `COMPLETE` | `REMOVED` | "cleanup", "remove resources" |
+| **Replay** | `REMOVED` | `COMPLETE` (recreated) | "replay manifest", "recreate" |
+| **Resume** | `IN_PROGRESS` | `COMPLETE` | "resume", "continue setup" |
+
+> [!TIP]
+> Say "replay the manifest" to recreate all REMOVED resources in a new conversation.
+
 > [!IMPORTANT]
 > The manifest is the source of truth. Don't edit it manually.
 
