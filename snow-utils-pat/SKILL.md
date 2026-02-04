@@ -119,46 +119,46 @@ tools_checked: true
 
 **First, check memory for cached infra status:**
 
-If memory has `infra_ready: true` with `sa_role` and `snow_utils_db` values:
+If memory has `infra_ready: true` with `snow_utils_db` value:
 
-- Use cached values
+- Use cached value
 - Skip infra check, go to Step 3
 
 **Otherwise, read from .env:**
 
 ```bash
-grep -E "^(SA_ROLE|SNOW_UTILS_DB)=" .env
+grep -E "^SNOW_UTILS_DB=" .env
 ```
 
-**If BOTH have values:** Skip to Step 3.
+**If SNOW_UTILS_DB has value:** Skip to Step 3.
 
-**If either is empty**, run check_setup.py with JSON output:
+**If empty**, run check_setup.py with --suggest flag:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --output json
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --suggest
 ```
 
-Parse the JSON response to determine status:
+Parse the JSON response:
 
-- `ready: true` → Infrastructure exists, skip to Step 3
-- `ready: false` → Need to create infrastructure
+- `ready: true` → Database exists, skip to Step 3
+- `ready: false` → Need to create database
 
 **If not ready**, use `ask_user_question` to confirm:
 
-- Show suggested values from JSON (`defaults.role`, `defaults.database`)
-- Ask user to confirm or provide custom values
+- Show suggested database name from JSON (`suggested_database`)
+- Ask user to confirm or provide custom value
 
 **If user confirms setup**, run:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --role <ROLE> --db <DB> --user <USER> --admin-role <SA_ADMIN_ROLE> --setup
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --database <DB> --run-setup
 ```
 
 **After setup completes, update .env:**
 
-- `SA_ROLE=<value user confirmed>`
 - `SNOW_UTILS_DB=<value user confirmed>`
-- `SA_ADMIN_ROLE=<value user confirmed>`
+
+**Note:** SA_ROLE ({PROJECT}_ACCESS) is created in Step 5 by this skill, not by check_setup.
 
 **Update memory:**
 
@@ -166,10 +166,88 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 Update /memories/snow-utils-prereqs.md:
 tools_checked: true
 infra_ready: true
-sa_role: <VALUE>
 snow_utils_db: <VALUE>
-sa_admin_role: <VALUE>
 ```
+
+### Step 2.5: Check SA_ADMIN_ROLE Privileges
+
+**This skill requires SA_ADMIN_ROLE to have specific privileges. Check BEFORE proceeding.**
+
+**Required privileges for PAT skill:**
+
+| Privilege | Scope | Required For | Default Role |
+|-----------|-------|--------------|--------------|
+| CREATE USER | Account | Creating service user | USERADMIN+ |
+| CREATE ROLE | Account | Creating SA_ROLE | USERADMIN+ |
+| MANAGE GRANTS | Account | Granting role to user | SECURITYADMIN+ |
+| CREATE AUTHENTICATION POLICY | Schema | Creating auth policy | Schema owner |
+
+**Check SA_ADMIN_ROLE from .env:**
+
+```bash
+grep -E "^SA_ADMIN_ROLE=" .env | cut -d= -f2
+```
+
+**If SA_ADMIN_ROLE is empty, default to ACCOUNTADMIN** (has all required privileges).
+
+**If SA_ADMIN_ROLE is set to a custom role**, verify it has required privileges:
+
+```bash
+set -a && source .env && set +a && snow sql -q "
+SHOW GRANTS TO ROLE <SA_ADMIN_ROLE>;
+" --format json
+```
+
+**Check for these grants in the output:**
+
+| Look For | Privilege | On |
+|----------|-----------|-----|
+| CREATE USER | `CREATE USER` | ACCOUNT |
+| CREATE ROLE | `CREATE ROLE` | ACCOUNT |
+| MANAGE GRANTS | `MANAGE GRANTS` | ACCOUNT |
+| CREATE AUTHENTICATION POLICY | `CREATE AUTHENTICATION POLICY` | SCHEMA (SNOW_UTILS_DB.POLICIES) |
+
+**If any privilege is missing**, use `ask_user_question` with options:
+
+| Option | Action |
+|--------|--------|
+| Grant missing privileges | Show GRANT statements for user to execute with elevated role |
+| Use a different role | Prompt for role name with required privileges (default: ACCOUNTADMIN) |
+| Cancel | Stop workflow |
+
+**If user chooses "Grant missing privileges":**
+
+Show SQL for each missing privilege:
+
+```sql
+-- Run as ACCOUNTADMIN or SECURITYADMIN
+GRANT CREATE USER ON ACCOUNT TO ROLE <SA_ADMIN_ROLE>;
+GRANT CREATE ROLE ON ACCOUNT TO ROLE <SA_ADMIN_ROLE>;
+GRANT MANAGE GRANTS ON ACCOUNT TO ROLE <SA_ADMIN_ROLE>;
+GRANT CREATE AUTHENTICATION POLICY ON SCHEMA <SNOW_UTILS_DB>.POLICIES TO ROLE <SA_ADMIN_ROLE>;
+```
+
+**STOP**: Wait for user to confirm privileges have been granted, then re-check.
+
+**If user chooses "Use a different role":**
+
+Use `ask_user_question` with `type: "text"`:
+
+```
+Enter role with required privileges:
+[ACCOUNTADMIN]
+```
+
+Update .env with the provided role:
+
+```bash
+# Update SA_ADMIN_ROLE in .env
+sed -i '' 's/^SA_ADMIN_ROLE=.*/SA_ADMIN_ROLE=<USER_PROVIDED_ROLE>/' .env
+```
+
+Continue to Step 3.
+
+**If SA_ADMIN_ROLE=ACCOUNTADMIN (default):** All privileges are available, continue to Step 3.
 
 ### Step 3: Gather Requirements (Demo-Context Naming)
 
@@ -517,6 +595,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 3. **Display info summary with single confirmation:**
 
 ```
+
 ℹ️  Replay from manifest will create:
 
   1. Network Rule:   {SA_USER}_NETWORK_RULE
@@ -531,6 +610,7 @@ Using values from manifest:
   Database: {SNOW_UTILS_DB}
 
 Proceed with creation? [yes/no]
+
 ```
 
 4. **On "yes":** Execute all creation steps without individual confirmations
@@ -544,15 +624,18 @@ Proceed with creation? [yes/no]
 2. **Display resume info:**
 
 ```
+
 ℹ️  Resuming from partial creation:
 
   ✓ Network Rule:   CREATED
   ✓ Network Policy: CREATED
-  - Auth Policy:    PENDING
-  - Service User:   PENDING
-  - PAT:            PENDING
+
+- Auth Policy:    PENDING
+- Service User:   PENDING
+- PAT:            PENDING
 
 Continue from Auth Policy creation? [yes/no]
+
 ```
 
 3. **On "yes":** Continue from first `pending` resource
@@ -561,6 +644,7 @@ Continue from Auth Policy creation? [yes/no]
 **Display success summary to user:**
 
 ```
+
 PAT Setup Complete!
 
 Resources Created:
@@ -572,6 +656,7 @@ Resources Created:
   PAT:            ***REDACTED*** (saved to .env as SNOWFLAKE_PASSWORD)
 
 Manifest updated: .snow-utils/snow-utils-manifest.md
+
 ```
 
 ## PAT Security

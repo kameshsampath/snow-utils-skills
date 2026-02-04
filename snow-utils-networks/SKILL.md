@@ -114,22 +114,24 @@ tools_checked: true
 
 **First, check memory for cached infra status:**
 
-If memory has `infra_ready: true` with `sa_role` and `snow_utils_db` values:
+If memory has `infra_ready: true` with `snow_utils_db` value:
 
-- Use cached values
+- Use cached value
 - Skip infra check, go to Step 3
 
 **Otherwise, read from .env:**
 
 ```bash
-grep -E "^(SA_ROLE|SA_USER|SNOW_UTILS_DB|SA_PAT)=" .env
+grep -E "^(SA_USER|SNOW_UTILS_DB|SA_PAT)=" .env
 ```
 
-**If SA_ROLE or SNOW_UTILS_DB is empty**, run check_setup.py first:
+**If SNOW_UTILS_DB is empty**, run check_setup.py first:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
+set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --suggest
 ```
+
+If not ready, prompt user and run with `--run-setup`.
 
 **If SA_PAT is empty:**
 
@@ -148,7 +150,7 @@ This ensures the network rules are created using the service account credentials
 
 **Do NOT proceed** until SA_PAT is populated in .env.
 
-**If ALL values present (SA_ROLE, SA_USER, SNOW_UTILS_DB, SA_PAT):**
+**If required values present (SA_USER, SNOW_UTILS_DB, SA_PAT):**
 
 **Update memory:**
 
@@ -156,12 +158,84 @@ This ensures the network rules are created using the service account credentials
 Update /memories/snow-utils-prereqs.md:
 tools_checked: true
 infra_ready: true
-sa_role: <SA_ROLE>
 snow_utils_db: <SNOW_UTILS_DB>
-sa_admin_role: <SA_ADMIN_ROLE>
+```
+
+Continue to Step 2.5.
+
+### Step 2.5: Check SA_ADMIN_ROLE Privileges
+
+**This skill requires SA_ADMIN_ROLE to have specific privileges. Check BEFORE proceeding.**
+
+**Required privileges for Networks skill:**
+
+| Privilege | Scope | Required For | Default Role |
+|-----------|-------|--------------|--------------|
+| CREATE NETWORK RULE | Schema | Creating network rules | ACCOUNTADMIN, SECURITYADMIN, Schema owner |
+| CREATE NETWORK POLICY | Account | Creating network policies | SECURITYADMIN+ |
+
+**Check SA_ADMIN_ROLE from .env:**
+
+```bash
+grep -E "^SA_ADMIN_ROLE=" .env | cut -d= -f2
+```
+
+**If SA_ADMIN_ROLE is empty, default to ACCOUNTADMIN** (has all required privileges).
+
+**If SA_ADMIN_ROLE is set to a custom role**, verify it has required privileges:
+
+```bash
+set -a && source .env && set +a && snow sql -q "
+SHOW GRANTS TO ROLE <SA_ADMIN_ROLE>;
+" --format json
+```
+
+**Check for these grants in the output:**
+
+| Look For | Privilege | On |
+|----------|-----------|-----|
+| CREATE NETWORK RULE | `CREATE NETWORK RULE` | SCHEMA (SNOW_UTILS_DB.NETWORKS) |
+| CREATE NETWORK POLICY | `CREATE NETWORK POLICY` | ACCOUNT |
+
+**If any privilege is missing**, use `ask_user_question` with options:
+
+| Option | Action |
+|--------|--------|
+| Grant missing privileges | Show GRANT statements for user to execute with elevated role |
+| Use a different role | Prompt for role name with required privileges (default: ACCOUNTADMIN) |
+| Cancel | Stop workflow |
+
+**If user chooses "Grant missing privileges":**
+
+Show SQL for each missing privilege:
+
+```sql
+-- Run as ACCOUNTADMIN or SECURITYADMIN
+GRANT CREATE NETWORK RULE ON SCHEMA <SNOW_UTILS_DB>.NETWORKS TO ROLE <SA_ADMIN_ROLE>;
+GRANT CREATE NETWORK POLICY ON ACCOUNT TO ROLE <SA_ADMIN_ROLE>;
+```
+
+**STOP**: Wait for user to confirm privileges have been granted, then re-check.
+
+**If user chooses "Use a different role":**
+
+Use `ask_user_question` with `type: "text"`:
+
+```
+Enter role with required privileges:
+[ACCOUNTADMIN]
+```
+
+Update .env with the provided role:
+
+```bash
+# Update SA_ADMIN_ROLE in .env
+sed -i '' 's/^SA_ADMIN_ROLE=.*/SA_ADMIN_ROLE=<USER_PROVIDED_ROLE>/' .env
 ```
 
 Continue to Step 3.
+
+**If SA_ADMIN_ROLE=ACCOUNTADMIN (default):** All privileges are available, continue to Step 3.
 
 ### Step 3: Gather Requirements (with Semantic Prompts)
 
