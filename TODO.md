@@ -200,6 +200,37 @@ Executes cleanup in dependency order:
 
 ---
 
+## 7. CLI Confirmation Handling for Non-Interactive Mode
+
+**Current:** CLI uses `@click.confirmation_option` which requires `--yes` flag in non-interactive context (CoCo bash).
+
+**Workaround:** SKILL.md instructs CoCo to add `--yes` to delete commands.
+
+**Proposed:** CLI checks `--output json` mode and skips confirmation:
+
+```python
+# Before (requires --yes in CoCo)
+@click.confirmation_option(prompt="Delete this network rule?")
+def rule_delete_cmd(...):
+
+# After (auto-skips in json mode)
+@click.option("-o", "--output", type=click.Choice(["text", "json"]), default="text")
+def rule_delete_cmd(..., output: str):
+    if output == "text":
+        if not click.confirm("Delete this network rule?", default=True):
+            raise click.Abort()
+    # proceed with delete
+```
+
+**Affected commands:**
+- `network.py rule delete`
+- `network.py policy delete`
+- `pat.py remove`
+
+**Pattern:** `--output json` = non-interactive (CoCo), `--output text` = interactive (CLI)
+
+---
+
 ## Implementation Order (Suggested)
 
 1. **Per-project manifest structure** - Foundation for other features
