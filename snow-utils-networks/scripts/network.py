@@ -58,12 +58,11 @@ def get_network_rule_sql(
         comment: Optional comment
 
     Returns:
-        CREATE OR REPLACE NETWORK RULE SQL statement
+        CREATE OR REPLACE NETWORK RULE SQL statement (idempotent)
     """
     value_list = ", ".join(f"'{v}'" for v in values)
     comment_text = comment or "Created by snow-utils"
-    create_stmt = "CREATE OR REPLACE" if force else "CREATE"
-    return f"""{create_stmt} NETWORK RULE {db}.{schema}.{name}
+    return f"""CREATE OR REPLACE NETWORK RULE {db}.{schema}.{name}
     MODE = {mode.value}
     TYPE = {rule_type.value}
     VALUE_LIST = ({value_list})
@@ -85,12 +84,11 @@ def get_network_policy_sql(
         comment: Optional comment
 
     Returns:
-        CREATE OR REPLACE NETWORK POLICY SQL statement
+        CREATE NETWORK POLICY IF NOT EXISTS SQL statement (idempotent)
     """
     rule_list = ", ".join(rule_refs)
     comment_text = comment or "Created by snow-utils"
-    create_stmt = "CREATE OR REPLACE" if force else "CREATE"
-    return f"""{create_stmt} NETWORK POLICY {policy_name}
+    return f"""CREATE NETWORK POLICY IF NOT EXISTS {policy_name}
     ALLOWED_NETWORK_RULE_LIST = ({rule_list})
     COMMENT = '{comment_text}';"""
 
@@ -124,6 +122,7 @@ def create_network_rule(
     comment: str = "",
     dry_run: bool = False,
     force: bool = False,
+    admin_role: str = "accountadmin",
 ) -> str:
     """
     Create a network rule in Snowflake.
@@ -137,6 +136,7 @@ def create_network_rule(
         rule_type: Value type
         comment: Optional comment
         dry_run: If True, only print SQL without executing
+        admin_role: Role for creating resources (default: accountadmin)
 
     Returns:
         Fully qualified network rule name (db.schema.name)
@@ -150,17 +150,28 @@ def create_network_rule(
             f"Invalid type '{rule_type.value}' for mode '{mode.value}'. Valid types: {valid}"
         )
 
+    rule_fqn = f"{db}.{schema}.{name}"
     sql = get_network_rule_sql(name, db, schema, values, mode, rule_type, comment, force)
 
     if dry_run:
         click.echo(sql)
     else:
-        setup_sql = (
-            f"CREATE DATABASE IF NOT EXISTS {db};\nCREATE SCHEMA IF NOT EXISTS {db}.{schema};\n"
-        )
+        attached_policies = get_policies_for_rule(rule_fqn, admin_role=admin_role)
+
+        if attached_policies:
+            click.echo(f"  Detaching rule from {len(attached_policies)} policy(ies)...")
+            for policy in attached_policies:
+                detach_rule_from_policy(policy, admin_role=admin_role)
+
+        setup_sql = f"USE ROLE {admin_role};\nCREATE DATABASE IF NOT EXISTS {db};\nCREATE SCHEMA IF NOT EXISTS {db}.{schema};\n"
         run_snow_sql_stdin(setup_sql + sql)
 
-    return f"{db}.{schema}.{name}"
+        if attached_policies:
+            click.echo(f"  Re-attaching rule to {len(attached_policies)} policy(ies)...")
+            for policy in attached_policies:
+                reattach_rule_to_policy(policy, rule_fqn, admin_role=admin_role)
+
+    return rule_fqn
 
 
 def create_network_policy(
@@ -169,6 +180,7 @@ def create_network_policy(
     comment: str = "",
     dry_run: bool = False,
     force: bool = False,
+    admin_role: str = "accountadmin",
 ) -> None:
     """
     Create a network policy referencing given rules.
@@ -178,19 +190,21 @@ def create_network_policy(
         rule_refs: List of fully qualified network rule names
         comment: Optional comment
         dry_run: If True, only print SQL without executing
+        admin_role: Role for creating resources (default: accountadmin)
     """
     sql = get_network_policy_sql(policy_name, rule_refs, comment, force)
 
     if dry_run:
         click.echo(sql)
     else:
-        run_snow_sql_stdin(sql)
+        run_snow_sql_stdin(f"USE ROLE {admin_role};\n{sql}")
 
 
 def alter_network_policy(
     policy_name: str,
     rule_refs: list[str],
     dry_run: bool = False,
+    admin_role: str = "accountadmin",
 ) -> None:
     """
     Add rules to an existing network policy.
@@ -199,13 +213,14 @@ def alter_network_policy(
         policy_name: Network policy name
         rule_refs: List of fully qualified network rule names to add
         dry_run: If True, only print SQL without executing
+        admin_role: Role for modifying resources (default: accountadmin)
     """
     sql = get_alter_network_policy_sql(policy_name, rule_refs)
 
     if dry_run:
         click.echo(sql)
     else:
-        run_snow_sql_stdin(sql)
+        run_snow_sql_stdin(f"USE ROLE {admin_role};\n{sql}")
 
 
 def get_update_network_rule_sql(
@@ -238,6 +253,7 @@ def update_network_rule(
     schema: str,
     values: list[str],
     dry_run: bool = False,
+    admin_role: str = "accountadmin",
 ) -> str:
     """
     Update an existing network rule with new values.
@@ -248,6 +264,7 @@ def update_network_rule(
         schema: Schema name
         values: New list of values
         dry_run: If True, only print SQL without executing
+        admin_role: Role for modifying resources (default: accountadmin)
 
     Returns:
         Fully qualified network rule name (db.schema.name)
@@ -257,7 +274,7 @@ def update_network_rule(
     if dry_run:
         click.echo(sql)
     else:
-        run_snow_sql_stdin(sql)
+        run_snow_sql_stdin(f"USE ROLE {admin_role};\n{sql}")
 
     return f"{db}.{schema}.{name}"
 
@@ -268,6 +285,7 @@ def update_network_for_user(
     cidrs: list[str],
     schema: str = "NETWORKS",
     dry_run: bool = False,
+    admin_role: str = "accountadmin",
 ) -> str:
     """
     Update the network rule CIDRs for an existing user.
@@ -281,6 +299,7 @@ def update_network_for_user(
         cidrs: New list of IPv4 CIDRs
         schema: Schema containing the rule (default: NETWORKS)
         dry_run: If True, only print SQL
+        admin_role: Role for modifying resources (default: accountadmin)
 
     Returns:
         Fully qualified network rule name
@@ -292,33 +311,69 @@ def update_network_for_user(
         schema=schema.upper(),
         values=cidrs,
         dry_run=dry_run,
+        admin_role=admin_role,
     )
 
 
-def delete_network_rule(name: str, db: str, schema: str) -> None:
+def delete_network_rule(name: str, db: str, schema: str, admin_role: str = "accountadmin") -> None:
     """Delete a network rule (idempotent)."""
-    run_snow_sql(f"DROP NETWORK RULE IF EXISTS {db}.{schema}.{name}")
+    run_snow_sql_stdin(f"USE ROLE {admin_role};\nDROP NETWORK RULE IF EXISTS {db}.{schema}.{name}")
 
 
-def delete_network_policy(policy_name: str) -> None:
+def delete_network_policy(policy_name: str, admin_role: str = "accountadmin") -> None:
     """Delete a network policy (idempotent)."""
-    run_snow_sql(f"DROP NETWORK POLICY IF EXISTS {policy_name}")
+    run_snow_sql_stdin(f"USE ROLE {admin_role};\nDROP NETWORK POLICY IF EXISTS {policy_name}")
 
 
-def list_network_rules(db: str, schema: str) -> list[dict]:
+def list_network_rules(db: str, schema: str, admin_role: str = "accountadmin") -> list[dict]:
     """List network rules in a schema."""
-    return run_snow_sql(f"SHOW NETWORK RULES IN SCHEMA {db}.{schema}") or []
+    return run_snow_sql(f"SHOW NETWORK RULES IN SCHEMA {db}.{schema}", role=admin_role) or []
 
 
-def list_network_policies() -> list[dict]:
+def list_network_policies(admin_role: str = "accountadmin") -> list[dict]:
     """List all network policies."""
-    return run_snow_sql("SHOW NETWORK POLICIES") or []
+    return run_snow_sql("SHOW NETWORK POLICIES", role=admin_role) or []
 
 
-def network_policy_exists(policy_name: str) -> bool:
+def network_policy_exists(policy_name: str, admin_role: str = "accountadmin") -> bool:
     """Check if a network policy exists."""
-    policies = list_network_policies()
+    policies = list_network_policies(admin_role=admin_role)
     return any(p.get("name", "").upper() == policy_name.upper() for p in policies)
+
+
+def get_policies_for_rule(rule_fqn: str, admin_role: str = "accountadmin") -> list[str]:
+    """Find all network policies that reference a given network rule.
+
+    Returns list of policy names that have this rule in their ALLOWED_NETWORK_RULE_LIST.
+    """
+    policies = list_network_policies(admin_role=admin_role)
+    result = []
+    for p in policies:
+        allowed_rules = p.get("entries_in_allowed_network_rules", 0)
+        if allowed_rules > 0:
+            policy_name = p.get("name", "")
+            desc = run_snow_sql(f"DESC NETWORK POLICY {policy_name}", role=admin_role) or []
+            for row in desc:
+                if row.get("name") == "ALLOWED_NETWORK_RULE_LIST":
+                    rules_str = row.get("value", "")
+                    if rule_fqn.upper() in rules_str.upper():
+                        result.append(policy_name)
+                        break
+    return result
+
+
+def detach_rule_from_policy(policy_name: str, admin_role: str = "accountadmin") -> None:
+    """Temporarily detach all rules from a policy (SET to empty list)."""
+    sql = f"USE ROLE {admin_role};\nALTER NETWORK POLICY IF EXISTS {policy_name} SET ALLOWED_NETWORK_RULE_LIST = ();"
+    run_snow_sql_stdin(sql)
+
+
+def reattach_rule_to_policy(
+    policy_name: str, rule_fqn: str, admin_role: str = "accountadmin"
+) -> None:
+    """Re-attach a rule to a policy."""
+    sql = f"USE ROLE {admin_role};\nALTER NETWORK POLICY IF EXISTS {policy_name} SET ALLOWED_NETWORK_RULE_LIST = ('{rule_fqn}');"
+    run_snow_sql_stdin(sql)
 
 
 def get_setup_network_for_user_sql(
@@ -327,6 +382,8 @@ def get_setup_network_for_user_sql(
     cidrs: list[str],
     schema: str = "NETWORKS",
     force: bool = False,
+    comment_prefix: str | None = None,
+    admin_role: str = "accountadmin",
 ) -> str:
     """
     Generate SQL for creating network rule and policy for a user.
@@ -339,6 +396,8 @@ def get_setup_network_for_user_sql(
         cidrs: List of IPv4 CIDRs
         schema: Schema for network rule (default: NETWORKS)
         force: If True, use CREATE OR REPLACE
+        comment_prefix: Comment prefix for SQL resources (inferred from user if not provided)
+        admin_role: Role for creating resources (default: accountadmin)
 
     Returns:
         Complete SQL string for rule and policy creation
@@ -346,6 +405,7 @@ def get_setup_network_for_user_sql(
     rule_name = f"{user}_NETWORK_RULE".upper()
     policy_name = f"{user}_NETWORK_POLICY".upper()
     rule_fqn = f"{db.upper()}.{schema.upper()}.{rule_name}"
+    ctx = comment_prefix or user.upper()
 
     rule_sql = get_network_rule_sql(
         name=rule_name,
@@ -354,18 +414,18 @@ def get_setup_network_for_user_sql(
         values=cidrs,
         mode=NetworkRuleMode.INGRESS,
         rule_type=NetworkRuleType.IPV4,
-        comment=f"Network rule for {user} access",
+        comment=f"{ctx} network rule - managed by snow-utils-pat",
         force=force,
     )
 
     policy_sql = get_network_policy_sql(
         policy_name=policy_name,
         rule_refs=[rule_fqn],
-        comment=f"Network policy for {user} access",
+        comment=f"{ctx} network policy - managed by snow-utils-pat",
         force=force,
     )
 
-    return f"{rule_sql}\n\n{policy_sql}"
+    return f"USE ROLE {admin_role};\n{rule_sql}\n\n{policy_sql}"
 
 
 def setup_network_for_user(
@@ -375,6 +435,8 @@ def setup_network_for_user(
     schema: str = "NETWORKS",
     dry_run: bool = False,
     force: bool = False,
+    comment_prefix: str | None = None,
+    admin_role: str = "accountadmin",
 ) -> tuple[str, str]:
     """
     Create network rule and policy for a user (idempotent).
@@ -388,12 +450,15 @@ def setup_network_for_user(
         cidrs: List of IPv4 CIDRs
         schema: Schema for network rule (default: NETWORKS)
         dry_run: If True, only print SQL
+        comment_prefix: Comment prefix for SQL resources (inferred from user if not provided)
+        admin_role: Role for creating resources (default: accountadmin)
 
     Returns:
         Tuple of (rule_fqn, policy_name)
     """
     rule_name = f"{user}_NETWORK_RULE".upper()
     policy_name = f"{user}_NETWORK_POLICY".upper()
+    ctx = comment_prefix or user.upper()
 
     rule_fqn = create_network_rule(
         name=rule_name,
@@ -402,17 +467,19 @@ def setup_network_for_user(
         values=cidrs,
         mode=NetworkRuleMode.INGRESS,
         rule_type=NetworkRuleType.IPV4,
-        comment=f"Network rule for {user} access",
+        comment=f"{ctx} network rule - managed by snow-utils-pat",
         dry_run=dry_run,
         force=force,
+        admin_role=admin_role,
     )
 
     create_network_policy(
         policy_name=policy_name,
         rule_refs=[rule_fqn],
-        comment=f"Network policy for {user} access",
+        comment=f"{ctx} network policy - managed by snow-utils-pat",
         dry_run=dry_run,
         force=force,
+        admin_role=admin_role,
     )
 
     return rule_fqn, policy_name
@@ -423,6 +490,7 @@ def cleanup_network_for_user(
     db: str,
     schema: str = "NETWORKS",
     unset_from_user: bool = True,
+    admin_role: str = "accountadmin",
 ) -> None:
     """
     Remove network rule and policy for a user (idempotent).
@@ -432,28 +500,35 @@ def cleanup_network_for_user(
         db: Database containing network rule
         schema: Schema containing network rule
         unset_from_user: If True, also unset network policy from user
+        admin_role: Role for dropping resources (default: accountadmin)
     """
     rule_name = f"{user}_NETWORK_RULE".upper()
     policy_name = f"{user}_NETWORK_POLICY".upper()
 
     if unset_from_user:
         run_snow_sql_stdin(
-            f"ALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;",
+            f"USE ROLE {admin_role};\nALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;",
             check=False,
         )
 
-    delete_network_policy(policy_name)
-    delete_network_rule(rule_name, db.upper(), schema.upper())
+    delete_network_policy(policy_name, admin_role=admin_role)
+    delete_network_rule(rule_name, db.upper(), schema.upper(), admin_role=admin_role)
 
 
-def assign_network_policy_to_user(user: str, policy_name: str) -> None:
+def assign_network_policy_to_user(
+    user: str, policy_name: str, admin_role: str = "accountadmin"
+) -> None:
     """Assign a network policy to a user."""
-    run_snow_sql_stdin(f"ALTER USER {user} SET NETWORK_POLICY = '{policy_name}';")
+    run_snow_sql_stdin(
+        f"USE ROLE {admin_role};\nALTER USER {user} SET NETWORK_POLICY = '{policy_name}';"
+    )
 
 
-def unassign_network_policy_from_user(user: str) -> None:
+def unassign_network_policy_from_user(user: str, admin_role: str = "accountadmin") -> None:
     """Remove network policy from a user (idempotent)."""
-    run_snow_sql_stdin(f"ALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;", check=False)
+    run_snow_sql_stdin(
+        f"USE ROLE {admin_role};\nALTER USER IF EXISTS {user} UNSET NETWORK_POLICY;", check=False
+    )
 
 
 MODE_CHOICES = ["ingress", "internal_stage", "egress", "postgres_ingress", "postgres_egress"]
@@ -544,6 +619,9 @@ def policy() -> None:
     default="create",
     help="Policy mode: 'create' (replace) or 'alter' (add to existing)",
 )
+@click.option(
+    "-o", "--output", type=click.Choice(["text", "json"]), default="text", help="Output format"
+)
 def rule_create(
     name: str,
     db: str,
@@ -558,6 +636,7 @@ def rule_create(
     force: bool,
     policy_name: str | None,
     policy_mode: str,
+    output: str,
 ) -> None:
     """
     Create a network rule with presets and/or custom values.
@@ -612,6 +691,14 @@ def rule_create(
         f"Creating {mode.upper()} network rule ({rule_type.upper()}) "
         f"with {len(all_values)} value(s)..."
     )
+
+    if dry_run:
+        click.echo("SQL that would be executed:")
+        click.echo("─" * 60)
+    elif output == "text":
+        if not click.confirm("\nProceed with network rule creation?", default=True):
+            click.echo("Aborted.")
+            return
 
     fqn = create_network_rule(
         name.upper(),
@@ -720,10 +807,17 @@ def rule_delete_cmd(name: str, db: str, schema: str) -> None:
 @rule.command(name="list")
 @click.option("--db", required=True, envvar="NW_RULE_DB", help="Database name")
 @click.option("--schema", "-s", default="NETWORKS", envvar="NW_RULE_SCHEMA", help="Schema name")
-def rule_list_cmd(db: str, schema: str) -> None:
+@click.option(
+    "--admin-role",
+    "-a",
+    envvar="SA_ADMIN_ROLE",
+    default="accountadmin",
+    help="Admin role for listing resources",
+)
+def rule_list_cmd(db: str, schema: str, admin_role: str) -> None:
     """List network rules in schema."""
     click.echo(f"Network rules in {db}.{schema}:".upper())
-    rules = list_network_rules(db.upper(), schema.upper())
+    rules = list_network_rules(db.upper(), schema.upper(), admin_role=admin_role)
 
     if not rules:
         click.echo("  (none)")
@@ -746,7 +840,8 @@ def rule_list_cmd(db: str, schema: str) -> None:
 )
 @click.option("--dry-run", is_flag=True, help="Preview SQL without executing")
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing policy (CREATE OR REPLACE)")
-def policy_create_cmd(name: str, rules: str, dry_run: bool, force: bool) -> None:
+@click.option("-o", "--output", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def policy_create_cmd(name: str, rules: str, dry_run: bool, force: bool, output: str) -> None:
     """
     Create a network policy with specified rules.
 
@@ -759,6 +854,15 @@ def policy_create_cmd(name: str, rules: str, dry_run: bool, force: bool) -> None
     policy_name = name.upper()
 
     click.echo(f"Creating policy {policy_name} with {len(rule_refs)} rule(s)...")
+
+    if dry_run:
+        click.echo("SQL that would be executed:")
+        click.echo("─" * 60)
+    elif output == "text":
+        if not click.confirm("\nProceed with network policy creation?", default=True):
+            click.echo("Aborted.")
+            return
+
     create_network_policy(policy_name, rule_refs, dry_run=dry_run, force=force)
     if not dry_run:
         click.echo(f"✓ Created: {policy_name}")
@@ -773,7 +877,8 @@ def policy_create_cmd(name: str, rules: str, dry_run: bool, force: bool) -> None
     help="Comma-separated fully qualified rule names (db.schema.rule)",
 )
 @click.option("--dry-run", is_flag=True, help="Preview SQL without executing")
-def policy_alter_cmd(name: str, rules: str, dry_run: bool) -> None:
+@click.option("-o", "--output", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def policy_alter_cmd(name: str, rules: str, dry_run: bool, output: str) -> None:
     """
     Add rules to an existing network policy.
 
@@ -786,6 +891,15 @@ def policy_alter_cmd(name: str, rules: str, dry_run: bool) -> None:
     policy_name = name.upper()
 
     click.echo(f"Adding {len(rule_refs)} rule(s) to policy: {policy_name}")
+
+    if dry_run:
+        click.echo("SQL that would be executed:")
+        click.echo("─" * 60)
+    elif output == "text":
+        if not click.confirm("\nProceed with policy modification?", default=True):
+            click.echo("Aborted.")
+            return
+
     alter_network_policy(policy_name, rule_refs, dry_run=dry_run)
     if not dry_run:
         click.echo(f"✓ Updated: {policy_name}")
@@ -794,23 +908,37 @@ def policy_alter_cmd(name: str, rules: str, dry_run: bool) -> None:
 @policy.command(name="delete")
 @click.option("--name", "-n", required=True, help="Network policy name")
 @click.option("--user", "-u", help="Also unset from this user first")
+@click.option(
+    "--admin-role",
+    "-a",
+    envvar="SA_ADMIN_ROLE",
+    default="accountadmin",
+    help="Admin role for modifying resources",
+)
 @click.confirmation_option(prompt="Delete this network policy?")
-def policy_delete_cmd(name: str, user: str | None) -> None:
+def policy_delete_cmd(name: str, user: str | None, admin_role: str) -> None:
     """Delete a network policy."""
     policy_name = name.upper()
     if user:
         click.echo(f"Unsetting policy from user: {user}")
-        unassign_network_policy_from_user(user)
+        unassign_network_policy_from_user(user, admin_role=admin_role)
     click.echo(f"Deleting network policy: {policy_name}")
-    delete_network_policy(policy_name)
+    delete_network_policy(policy_name, admin_role=admin_role)
     click.echo(f"✓ Deleted: {policy_name}")
 
 
 @policy.command(name="list")
-def policy_list_cmd() -> None:
+@click.option(
+    "--admin-role",
+    "-a",
+    envvar="SA_ADMIN_ROLE",
+    default="accountadmin",
+    help="Admin role for listing resources",
+)
+def policy_list_cmd(admin_role: str) -> None:
     """List all network policies."""
     click.echo("Network policies:")
-    policies = list_network_policies()
+    policies = list_network_policies(admin_role=admin_role)
 
     if not policies:
         click.echo("  (none)")
