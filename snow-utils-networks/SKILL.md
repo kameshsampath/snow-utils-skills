@@ -484,7 +484,7 @@ CoCo can use this manifest to replay creation or cleanup resources.
 **After network rule created:**
 
 ```markdown
-<!-- START -- snow-utils-networks -->
+<!-- START -- snow-utils-networks:{NW_RULE_NAME} -->
 ## Network Resources: {COMMENT_PREFIX}
 
 **Created:** {TIMESTAMP}
@@ -507,13 +507,13 @@ CoCo can use this manifest to replay creation or cleanup resources.
 | GitHub Actions | {yes/no} |
 | Google Cloud | {yes/no} |
 | Custom CIDRs | {list or none} |
-<!-- END -- snow-utils-networks -->
+<!-- END -- snow-utils-networks:{NW_RULE_NAME} -->
 ```
 
 **After all resources created, update Status to COMPLETE and add cleanup:**
 
 ```markdown
-<!-- START -- snow-utils-networks -->
+<!-- START -- snow-utils-networks:{NW_RULE_NAME} -->
 ## Network Resources: {COMMENT_PREFIX}
 
 **Created:** {TIMESTAMP}
@@ -564,7 +564,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 ```
 
 </details>
-<!-- END -- snow-utils-networks -->
+<!-- END -- snow-utils-networks:{NW_RULE_NAME} -->
 ```
 
 #### Remove Flow (Manifest-Driven Cleanup)
@@ -587,7 +587,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
    - If yes, ask for NW_RULE_NAME and NW_RULE_DB values
 
 3. **If manifest EXISTS:**
-   - Read the `<!-- START -- snow-utils-networks -->` to `<!-- END -- snow-utils-networks -->` section
+   - Read the `<!-- START -- snow-utils-networks:{NW_RULE_NAME} -->` section
    - Find the **"CLI Cleanup (REQUIRED)"** section in manifest
    - **Execute the command exactly as written in the manifest**
 
@@ -609,9 +609,11 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
 5. **On confirmation:** Execute the CLI command from manifest
 
-6. **After cleanup success:**
-   - Remove the `<!-- START -- snow-utils-networks -->` to `<!-- END -- snow-utils-networks -->` section from manifest
-   - If manifest becomes empty (only header): Optionally delete the file
+6. **After cleanup success, update manifest status to REMOVED:**
+
+   Change `**Status:** COMPLETE` to `**Status:** REMOVED` in the section.
+
+   **DO NOT delete the section** - it's needed for replay flow.
 
 > **Why manifest-driven?** The manifest captures exact resource names created during setup.
 > Using CLI ensures proper dependency order, syntax, and error handling.
@@ -621,8 +623,16 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 **If user asks to replay/recreate from manifest:**
 
 1. **Read manifest** `.snow-utils/snow-utils-manifest.md`
-2. **Find section** `<!-- START -- snow-utils-networks -->`
-3. **Display info summary with single confirmation:**
+2. **Find section** `<!-- START -- snow-utils-networks:{NW_RULE_NAME} -->`
+3. **Check Status:**
+
+| Status | Action |
+|--------|--------|
+| `REMOVED` | Proceed with creation (resources don't exist) |
+| `COMPLETE` | Warn: "Resources already exist. Run 'remove' first or choose 'recreate'" |
+| `IN_PROGRESS` | Use Resume Flow instead (partial creation) |
+
+4. **Display info summary with single confirmation:**
 
 ```
 
@@ -642,7 +652,7 @@ Proceed with creation? [yes/no]
 ```
 
 1. **On "yes":** Execute all creation steps without individual confirmations
-2. **Update manifest** progressively as each resource is created
+2. **Update manifest** status back to COMPLETE as each resource is created
 
 #### Resume Flow (Partial Creation Recovery)
 
@@ -663,7 +673,7 @@ Continue from Network Policy creation? [yes/no]
 
 ```
 
-1. **On "yes":** Continue from first `pending` resource
+1. **On "yes":** Continue from first `PENDING` resource
 2. **Update manifest** as each remaining resource is created
 
 **Display success summary to user:**
