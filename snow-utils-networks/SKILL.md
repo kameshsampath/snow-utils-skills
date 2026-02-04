@@ -634,7 +634,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 | `COMPLETE` | Warn: "Resources already exist. Run 'remove' first or choose 'recreate'" |
 | `IN_PROGRESS` | Use Resume Flow instead (partial creation) |
 
-4. **Display info summary with single confirmation:**
+1. **Display info summary with single confirmation:**
 
 ```
 

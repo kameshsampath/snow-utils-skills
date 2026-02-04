@@ -1,56 +1,82 @@
-# Snow Utils Skills
+# snow-utils-skills
 
-CoCo skills for Snowflake automation tasks.
+[Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code) skills for Snowflake infrastructure automation.
 
-## Overview
+## What is this?
 
-These skills were built using the [snow-bin-utils](https://github.com/kameshsampath/snow-bin-utils) project. They follow the Claude Skills style but are called **CoCo skills** for use with CoCo/Cortex Code.
-
-> [!IMPORTANT]
-> Currently, the skills only support external volumes with AWS (S3).
+A collection of skills that enable natural language automation of common Snowflake infrastructure tasks. Ask Cortex Code to create service accounts, network rules, or external volumes - it handles the complexity.
 
 ## Skills
 
-| Skill | Description |
-|-------|-------------|
-| `iceberg-external-volume` | Create S3 bucket, IAM role/policy, and Snowflake external volume |
-| `snowflake-pat` | Create service users with Programmatic Access Tokens |
+| Skill | Description | Sample Prompts |
+|-------|-------------|----------------|
+| [snow-utils-pat](./snow-utils-pat/) | Service account PAT creation | "Create a PAT for service account", "Rotate my PAT" |
+| [snow-utils-networks](./snow-utils-networks/) | Network rules & policies | "Create network rule for my IP", "Allow GitHub Actions" |
+| [snow-utils-volumes](./snow-utils-volumes/) | External volumes for Iceberg | "Create external volume for S3" |
 
-## Installation
+## Quick Start
 
-Add skills using the CoCo or Cortex CLI:
+### 1. Install Prerequisites
 
 ```bash
-# Using coco
-coco skill add https://github.com/kameshsampath/snow-utils-skills
+# Python package manager
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Or using cortex
-cortex skill add https://github.com/kameshsampath/snow-utils-skills
+# Snowflake CLI
+uv tool install snowflake-cli
 ```
 
-## Usage
-
-Trigger the skills with phrases like:
-
-- "setup iceberg storage" or "create external volume"
-- "create PAT" or "setup service account"
-
-## Updating
-
-To update to the latest version:
+### 2. Configure Snowflake Connection
 
 ```bash
-# Using coco
-coco skill update snow-utils-skills
+snow connection add
+snow connection test -c <connection_name>
+```
 
-# Or using cortex
-cortex skill update snow-utils-skills
+### 3. Use with Cortex Code
+
+Open Cortex Code and try:
+
+```
+"Create a PAT for my service account"
+"Create a network rule for my local IP"
+"Set up an external volume for S3"
+```
+
+## Features
+
+- **Natural Language Interface** - Describe what you want, skills handle the details
+- **Interactive Workflows** - Prompts for confirmation at each step
+- **Manifest Tracking** - All resources recorded for replay, audit, and cleanup
+- **Idempotent Operations** - Safe to re-run without side effects
+- **Smart Detection** - Skills share configuration when used together
+
+## Documentation
+
+- [Cortex Code Documentation](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code)
+- [Snowflake CLI Documentation](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index)
+
+## Project Structure
+
+```
+snow-utils-skills/
+├── common/                    # Shared Python utilities
+├── snow-utils-pat/           # PAT skill
+│   ├── SKILL.md              # Skill workflow (for CoCo)
+│   ├── README.md             # User documentation
+│   └── scripts/              # CLI tools
+├── snow-utils-networks/      # Networks skill
+│   ├── SKILL.md
+│   ├── README.md
+│   └── scripts/
+├── snow-utils-volumes/       # Volumes skill
+│   ├── SKILL.md
+│   ├── README.md
+│   └── scripts/
+├── TESTING.md                # Test cases for all skills
+└── TODO.md                   # v2 roadmap
 ```
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Citation
-
-If you use this software, please cite it using the information in [CITATION.cff](CITATION.cff).
+Apache 2.0
