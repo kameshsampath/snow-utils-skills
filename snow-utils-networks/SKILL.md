@@ -9,9 +9,9 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 ## Workflow
 
-**📋 PREREQUISITE:** This skill requires `snow-utils-pat` to be run first. If SA_PAT is not set in .env, stop and direct user to run snow-utils-pat.
+**📋 PREREQUISITE:** None. This skill can be used standalone or alongside other snow-utils skills.
 
-**⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) for all object creation. SA_ROLE is a consumer-only role with no CREATE privileges. Uses SA_ADMIN_ROLE (defaults to ACCOUNTADMIN) for privileged operations. After creation, USAGE grants are given to SA_ROLE so apps/demos can use the resources via SA_PAT.
+**⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) for all object creation. Uses NW_ADMIN_ROLE (defaults to ACCOUNTADMIN) for privileged operations.
 
 **🔄 IDEMPOTENCY NOTE:** Network rules use `CREATE OR REPLACE` (Snowflake does not support `IF NOT EXISTS` for network rules). Network policies use `CREATE IF NOT EXISTS` to preserve existing policies. Re-running create operations is safe for automation.
 
@@ -82,7 +82,7 @@ tools_checked: true
    **If .env exists**, merge missing keys from .env.example:
    - Read existing .env
    - Add only keys that don't exist (preserve all existing values)
-   - Keys to check: SNOWFLAKE_DEFAULT_CONNECTION_NAME, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_ACCOUNT_URL, SA_ROLE, SA_USER, SNOW_UTILS_DB, SA_PAT, NW_RULE_NAME, NW_RULE_DB, NW_RULE_SCHEMA, LOCAL_IP
+   - Keys to check: SNOWFLAKE_DEFAULT_CONNECTION_NAME, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_ACCOUNT_URL, SNOW_UTILS_DB, NW_ADMIN_ROLE, NW_RULE_NAME, NW_RULE_DB, NW_RULE_SCHEMA, LOCAL_IP
 
 3. **Check connection details in .env:**
 
@@ -120,12 +120,12 @@ tools_checked: true
 If memory has `infra_ready: true` with `snow_utils_db` value:
 
 - Use cached value
-- Skip infra check, go to Step 3
+- Skip infra check, go to Step 2a
 
 **Otherwise, read from .env:**
 
 ```bash
-grep -E "^(SA_USER|SNOW_UTILS_DB|SA_PAT)=" .env
+grep -E "^SNOW_UTILS_DB=" .env
 ```
 
 **If SNOW_UTILS_DB is empty**, run check_setup.py first:
@@ -136,24 +136,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 
 If not ready, prompt user and run with `--run-setup`.
 
-**If SA_PAT is empty:**
-
-⚠️ **STOP** - Service account PAT is required before creating network rules.
-
-Tell the user:
-
-```
-SA_PAT is not set. You need to create a PAT for the service account first.
-
-Run the snow-utils-pat skill to create the PAT:
-  "Create a PAT for service account"
-
-This ensures the network rules are created using the service account credentials.
-```
-
-**Do NOT proceed** until SA_PAT is populated in .env.
-
-**If required values present (SA_USER, SNOW_UTILS_DB, SA_PAT):**
+**If SNOW_UTILS_DB is present:**
 
 **Update memory:**
 
@@ -164,11 +147,11 @@ infra_ready: true
 snow_utils_db: <SNOW_UTILS_DB>
 ```
 
-Continue to Step 2.5.
+Continue to Step 2a.
 
-### Step 2.5: Check SA_ADMIN_ROLE Privileges
+### Step 2a: Check NW_ADMIN_ROLE (Smart Detection)
 
-**This skill requires SA_ADMIN_ROLE to have specific privileges. Check BEFORE proceeding.**
+**This skill requires NW_ADMIN_ROLE to have specific privileges. Check BEFORE proceeding.**
 
 **Required privileges for Networks skill:**
 
@@ -177,19 +160,51 @@ Continue to Step 2.5.
 | CREATE NETWORK RULE | Schema | Creating network rules | ACCOUNTADMIN, SECURITYADMIN, Schema owner |
 | CREATE NETWORK POLICY | Account | Creating network policies | SECURITYADMIN+ |
 
-**Check SA_ADMIN_ROLE from .env:**
+**Step 2a-i: Check NW_ADMIN_ROLE from .env:**
+
+```bash
+grep -E "^NW_ADMIN_ROLE=" .env | cut -d= -f2
+```
+
+**Step 2a-ii: If NW_ADMIN_ROLE is empty, check for SA_ADMIN_ROLE (smart detection):**
 
 ```bash
 grep -E "^SA_ADMIN_ROLE=" .env | cut -d= -f2
 ```
 
-**If SA_ADMIN_ROLE is empty, default to ACCOUNTADMIN** (has all required privileges).
+**Step 2a-iii: If SA_ADMIN_ROLE is set**, use `ask_user_question`:
 
-**If SA_ADMIN_ROLE is set to a custom role**, verify it has required privileges:
+```
+Detected SA_ADMIN_ROLE={value} from PAT skill.
+
+Use the same role for network operations?
+- Yes, use {value}
+- No, specify different role
+```
+
+- **If Yes:** Map SA_ADMIN_ROLE value to NW_ADMIN_ROLE
+- **If No:** Prompt for custom role (see 2a-iv)
+
+**Step 2a-iv: If neither is set (or user chose "No")**, prompt user:
+
+Use `ask_user_question` with `type: "text"`:
+
+```
+Admin role for network operations:
+[ACCOUNTADMIN]
+```
+
+**Step 2a-v: Save to .env:**
+
+```bash
+sed -i '' 's/^NW_ADMIN_ROLE=.*/NW_ADMIN_ROLE=<VALUE>/' .env
+```
+
+**Step 2a-vi: If NW_ADMIN_ROLE is set to a custom role**, verify it has required privileges:
 
 ```bash
 set -a && source .env && set +a && snow sql -q "
-SHOW GRANTS TO ROLE <SA_ADMIN_ROLE>;
+SHOW GRANTS TO ROLE <NW_ADMIN_ROLE>;
 " --format json
 ```
 
@@ -214,31 +229,19 @@ Show SQL for each missing privilege:
 
 ```sql
 -- Run as ACCOUNTADMIN or SECURITYADMIN
-GRANT CREATE NETWORK RULE ON SCHEMA <SNOW_UTILS_DB>.NETWORKS TO ROLE <SA_ADMIN_ROLE>;
-GRANT CREATE NETWORK POLICY ON ACCOUNT TO ROLE <SA_ADMIN_ROLE>;
+GRANT CREATE NETWORK RULE ON SCHEMA <SNOW_UTILS_DB>.NETWORKS TO ROLE <NW_ADMIN_ROLE>;
+GRANT CREATE NETWORK POLICY ON ACCOUNT TO ROLE <NW_ADMIN_ROLE>;
 ```
 
 **STOP**: Wait for user to confirm privileges have been granted, then re-check.
 
 **If user chooses "Use a different role":**
 
-Use `ask_user_question` with `type: "text"`:
-
-```
-Enter role with required privileges:
-[ACCOUNTADMIN]
-```
-
-Update .env with the provided role:
-
-```bash
-# Update SA_ADMIN_ROLE in .env
-sed -i '' 's/^SA_ADMIN_ROLE=.*/SA_ADMIN_ROLE=<USER_PROVIDED_ROLE>/' .env
-```
+Go back to Step 2a-iv.
 
 Continue to Step 3.
 
-**If SA_ADMIN_ROLE=ACCOUNTADMIN (default):** All privileges are available, continue to Step 3.
+**If NW_ADMIN_ROLE=ACCOUNTADMIN (default):** All privileges are available, continue to Step 3.
 
 ### Step 3: Gather Requirements (with Semantic Prompts)
 
@@ -312,7 +315,7 @@ Example: 10.0.0.0/8, 192.168.1.0/24
 - `NW_RULE_DB=<confirmed_value>` (may equal SNOW_UTILS_DB)
 - `NW_RULE_SCHEMA=<confirmed_value>`
 
-### Step 3.5: Check for Existing Network Rule
+### Step 3a: Check for Existing Network Rule
 
 **Check if network rule already exists (use exact name, never wildcards):**
 
@@ -396,8 +399,8 @@ Values:    3 CIDRs
 **Part 2 - Full SQL (MANDATORY - do not skip on first display):**
 
 ```sql
--- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
-USE ROLE <SA_ADMIN_ROLE>;
+-- Uses NW_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
+USE ROLE <NW_ADMIN_ROLE>;
 CREATE NETWORK RULE MY_DB.NETWORKS.MYAPP_RUNNER_NETWORK_RULE
     MODE = INGRESS
     TYPE = IPV4
@@ -493,8 +496,8 @@ CoCo can use this manifest to replay creation or cleanup resources.
 
 | # | Type | Name | Location | Status |
 |---|------|------|----------|--------|
-| 1 | Network Rule | {NW_RULE_NAME} | {NW_RULE_DB}.{NW_RULE_SCHEMA} | ✓ |
-| 2 | Network Policy | {NW_RULE_NAME}_POLICY | Account | pending |
+| 1 | Network Rule | {NW_RULE_NAME} | {NW_RULE_DB}.{NW_RULE_SCHEMA} | DONE |
+| 2 | Network Policy | {NW_RULE_NAME}_POLICY | Account | PENDING |
 
 ### IP Sources
 
@@ -522,8 +525,8 @@ CoCo can use this manifest to replay creation or cleanup resources.
 
 | # | Type | Name | Location | Status |
 |---|------|------|----------|--------|
-| 1 | Network Rule | {NW_RULE_NAME} | {NW_RULE_DB}.{NW_RULE_SCHEMA} | ✓ |
-| 2 | Network Policy | {NW_RULE_NAME}_POLICY | Account | ✓ |
+| 1 | Network Rule | {NW_RULE_NAME} | {NW_RULE_DB}.{NW_RULE_SCHEMA} | DONE |
+| 2 | Network Policy | {NW_RULE_NAME}_POLICY | Account | DONE |
 
 ### IP Sources
 
@@ -553,7 +556,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 <summary>Manual SQL cleanup (dependency order)</summary>
 
 ```sql
-USE ROLE {SA_ADMIN_ROLE};
+USE ROLE {NW_ADMIN_ROLE};
 -- 1. Drop network policy first (depends on rule)
 DROP NETWORK POLICY IF EXISTS {NW_RULE_NAME}_POLICY;
 -- 2. Drop network rule
@@ -645,7 +648,7 @@ Proceed with creation? [yes/no]
 
 **If manifest shows Status: IN_PROGRESS:**
 
-1. **Read which resources have status `✓`** (already created)
+1. **Read which resources have status `DONE`** (already created)
 2. **Display resume info:**
 
 ```
@@ -781,7 +784,7 @@ If you need IPv6 support, you would need to create a separate network rule with 
 
 **Infrastructure not set up:** Run `python -m snow_utils_common.check_setup` from common - it will prompt and offer to create.
 
-**Permission denied:** Ensure SA_ADMIN_ROLE (from .env, defaults to ACCOUNTADMIN) has CREATE NETWORK RULE and CREATE NETWORK POLICY privileges. SA_ROLE is consumer-only and cannot create resources.
+**Permission denied:** Ensure NW_ADMIN_ROLE (from .env, defaults to ACCOUNTADMIN) has CREATE NETWORK RULE and CREATE NETWORK POLICY privileges.
 
 **Rule already exists:** Use Step 3.5 flow - choose "Update existing" to modify IPs or "Remove and recreate" for fresh start.
 
