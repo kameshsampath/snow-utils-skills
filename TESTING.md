@@ -18,7 +18,8 @@ This document tracks test scenarios for PAT and Networks skills.
 |---|---------|----------------------|-------------------|--------|
 | 2 | Auth policy expiry | "Create a PAT for service account" | Prompts for expiry (defaults 15/365), waits for confirmation | |
 | 3 | Contextual COMMENTs | Create PAT for `MYAPP_RUNNER` | SQL shows `COMMENT = 'MYAPP ... - managed by snow-utils-pat'` | |
-| 5 | Progressive manifest | Create PAT, check manifest mid-way | Manifest shows IN_PROGRESS with ✓/pending status | |
+| 5a | Progressive manifest (Network) | Create PAT, check manifest after network resources | Manifest shows network rule ✓, network policy ✓, auth policy pending | |
+| 5b | Progressive manifest (PAT) | Continue creation, check manifest after PAT | Manifest shows all ✓, Status: COMPLETE | |
 | 6 | .env chmod 600 | After PAT creation | `ls -la .env` shows `-rw-------` | |
 | 7 | PAT verification | After create | Runs `snow sql -x` successfully | |
 
