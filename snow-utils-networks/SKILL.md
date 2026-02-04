@@ -432,13 +432,13 @@ This enables:
 
 ### Step 5: Create Resources
 
-**Execute:**
+**Execute (use --output json to skip CLI confirmation - CoCo handles it):**
 
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
   rule create --name <NW_RULE_NAME> --db <NW_RULE_DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
-  [--policy <POLICY_NAME>]
+  [--policy <POLICY_NAME>] --output json
 ```
 
 **On success:**
