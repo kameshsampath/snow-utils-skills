@@ -38,7 +38,7 @@ When about to write/edit a sensitive value like `SA_PAT`:
 3. **After write, show REDACTED confirmation:**
 
    ```
-   ✓ Updated .env: SA_PAT='***REDACTED***'
+   DONE: Updated .env: SA_PAT='***REDACTED***'
    ```
 
 **INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
@@ -507,8 +507,8 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../snow-utils-ne
 
 **CLI shows progress:**
 
-- ✓ Network rule created
-- ✓ Network policy created
+- DONE: Network rule created
+- DONE: Network policy created
 
 > **Note:** Policy assignment to user happens after Step 5b creates the user.
 
@@ -529,9 +529,9 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 **CLI shows progress:**
 
-- ✓ Role and user configured
-- ✓ Auth policy created
-- ✓ PAT created
+- DONE: Role and user configured
+- DONE: Auth policy created
+- DONE: PAT created
 
 > **Note:** `--skip-network` tells pat.py that network resources were created in Step 5a.
 
@@ -568,7 +568,7 @@ chmod 600 .env
 **Show REDACTED confirmation (NOT the actual value):**
 
 ```
-✓ .env updated:
+DONE: .env updated:
   - SA_PAT='***REDACTED***'
   - Permissions: -rw------- (600)
 ```
@@ -598,13 +598,13 @@ This manifest records all Snowflake resources created by snow-utils skills.
 
 | # | Type | Name | Location | Status |
 |---|------|------|----------|--------|
-| 1 | Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS | ✓ |
-| 2 | Network Policy | {SA_USER}_NETWORK_POLICY | Account | ✓ |
-| 3 | Policy Assignment | → {SA_USER} | Account | ✓ |
-| 4 | Service Role | {SA_ROLE} | Account | ✓ |
-| 5 | Service User | {SA_USER} | Account | ✓ |
-| 6 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | ✓ |
-| 7 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | ✓ |
+| 1 | Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS | DONE |
+| 2 | Network Policy | {SA_USER}_NETWORK_POLICY | Account | DONE |
+| 3 | Policy Assignment | → {SA_USER} | Account | DONE |
+| 4 | Service Role | {SA_ROLE} | Account | DONE |
+| 5 | Service User | {SA_USER} | Account | DONE |
+| 6 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | DONE |
+| 7 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | DONE |
 
 ### Cleanup Instructions
 
@@ -685,15 +685,15 @@ This enables recovery if CoCo loses context mid-creation.
 
 | # | Type | Name | Location | Status |
 |---|------|------|----------|--------|
-| 1 | Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS | ✓ |
-| 2 | Network Policy | {SA_USER}_NETWORK_POLICY | Account | pending |
-| 3 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | pending |
-| 4 | Service User | {SA_USER} | Account | pending |
-| 5 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | pending |
+| 1 | Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS | DONE |
+| 2 | Network Policy | {SA_USER}_NETWORK_POLICY | Account | PENDING |
+| 3 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | PENDING |
+| 4 | Service User | {SA_USER} | Account | PENDING |
+| 5 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | PENDING |
 <!-- END -- snow-utils-pat -->
 ```
 
-**After each subsequent resource, update status from `pending` to `✓`.**
+**After each subsequent resource, update status from `PENDING` to `DONE`.**
 
 **After all resources created, update Status to COMPLETE and add cleanup instructions section:**
 
@@ -712,11 +712,11 @@ This enables recovery if CoCo loses context mid-creation.
 
 | # | Type | Name | Location | Status |
 |---|------|------|----------|--------|
-| 1 | Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS | ✓ |
-| 2 | Network Policy | {SA_USER}_NETWORK_POLICY | Account | ✓ |
-| 3 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | ✓ |
-| 4 | Service User | {SA_USER} | Account | ✓ |
-| 5 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | ✓ |
+| 1 | Network Rule | {SA_USER}_NETWORK_RULE | {SNOW_UTILS_DB}.NETWORKS | DONE |
+| 2 | Network Policy | {SA_USER}_NETWORK_POLICY | Account | DONE |
+| 3 | Auth Policy | {SA_USER}_AUTH_POLICY | {SNOW_UTILS_DB}.POLICIES | DONE |
+| 4 | Service User | {SA_USER} | Account | DONE |
+| 5 | PAT | {SA_USER}_PAT | Attached to {SA_USER} | DONE |
 
 ### Cleanup Instructions
 
@@ -895,15 +895,15 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 **If manifest shows Status: IN_PROGRESS:**
 
-1. **Read which resources have status `✓`** (already created)
+1. **Read which resources have status `DONE`** (already created)
 2. **Display resume info:**
 
 ```
 
 ℹ️  Resuming from partial creation:
 
-  ✓ Network Rule:   CREATED
-  ✓ Network Policy: CREATED
+  DONE: Network Rule
+  DONE: Network Policy
 
 - Auth Policy:    PENDING
 - Service User:   PENDING
@@ -913,7 +913,7 @@ Continue from Auth Policy creation? [yes/no]
 
 ```
 
-1. **On "yes":** Continue from first `pending` resource
+1. **On "yes":** Continue from first `PENDING` resource
 2. **Update manifest** as each remaining resource is created
 
 **Display success summary to user:**
@@ -1034,7 +1034,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 | `rotate` | Update .env (SA_PAT with new token) → Run `verify` |
 | `remove` | Read manifest first for exact names → Clear SA_PAT from .env → Remove skill section from manifest |
 | `replay` | Read manifest → Single info confirmation → Execute all steps → Update manifest progressively |
-| `resume` | Read manifest (IN_PROGRESS) → Show completed/pending → Continue from first pending |
+| `resume` | Read manifest (IN_PROGRESS) → Show completed/PENDING → Continue from first PENDING |
 
 **Commands:**
 
