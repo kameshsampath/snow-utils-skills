@@ -444,7 +444,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 **On success:**
 
 - Show created resources
-- Write cleanup manifest (see Step 7)
+- Update manifest (see Step 7)
 
 **On failure:** Present error and remediation steps.
 
@@ -455,7 +455,9 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
   rule list --db <NW_RULE_DB>
 ```
 
-### Step 7: Write Success Summary and Cleanup Manifest
+### Step 7: Write Success Summary and Manifest
+
+> **Purpose:** The manifest enables replay, audit, and cleanup operations.
 
 **Manifest Location:** `.snow-utils/snow-utils-manifest.md`
 
