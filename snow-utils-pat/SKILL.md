@@ -510,7 +510,20 @@ This creates:
 1. **Network Rule**: `{SA_USER}_NETWORK_RULE` in `{SNOW_UTILS_DB}.NETWORKS`
 2. **Network Policy**: `{SA_USER}_NETWORK_POLICY` (account-level)
 
-**On success:** Update manifest with network resources (✓), proceed to Step 5b.
+**On success:**
+
+1. **Initialize manifest** (if first resource):
+   ```bash
+   mkdir -p .snow-utils
+   ```
+   Create `.snow-utils/snow-utils-manifest.md` with header and IN_PROGRESS section (see Step 7 for format).
+
+2. **Update manifest** - mark network resources as ✓:
+   - Network Rule: ✓
+   - Network Policy: ✓
+   - Remaining resources: pending
+
+3. Proceed to Step 5b.
 
 **On failure:** Present error and remediation steps. Do NOT proceed to Step 5b.
 
@@ -537,7 +550,13 @@ This creates:
 
 **On success, the script outputs JSON with the PAT token.**
 
-Proceed to Step 5c to update .env.
+1. **Update manifest** - mark PAT resources as ✓:
+   - Service Role: ✓
+   - Service User: ✓
+   - Auth Policy: ✓
+   - PAT: ✓
+
+2. Proceed to Step 5c to update .env.
 
 **On failure:** Present error and remediation steps.
 
@@ -565,6 +584,8 @@ chmod 600 .env
 ls -la .env | grep -E "^-rw-------"
 ```
 
+**4. Update manifest status to COMPLETE** (all resources now created).
+
 **🔒 Security Notes:**
 
 - Single quotes around PAT prevent shell interpretation of special characters
@@ -591,7 +612,10 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 - Verify auth policy is attached to user
 - Run with `--debug` flag for detailed output
 
-### Step 7: Write Resource Manifest
+### Step 7: Resource Manifest Format Reference
+
+> **When to write:** Manifest is updated PROGRESSIVELY in Steps 5a, 5b, 5c - NOT here.
+> This section defines the FORMAT to use.
 
 **Manifest Location:** `.snow-utils/snow-utils-manifest.md`
 
