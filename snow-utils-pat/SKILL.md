@@ -249,7 +249,7 @@ Continue to Step 3.
 
 **If SA_ADMIN_ROLE=ACCOUNTADMIN (default):** All privileges are available, continue to Step 3.
 
-### Step 3: Gather Requirements (Demo-Context Naming)
+### Step 3: Gather Requirements (User-Prefixed Demo-Context Naming)
 
 **Detect demo context from current directory:**
 
@@ -265,32 +265,62 @@ Example: `hirc-duckdb-demo` → demo context = `HIRC_DUCKDB_DEMO`
 grep -E "^(SNOWFLAKE_USER|SA_ROLE|SNOW_UTILS_DB)=" .env
 ```
 
-**NAMING CONVENTION (Demo-Context):**
+**NAMING CONVENTION (User-Prefixed Demo-Context):**
 
-Both SA_ROLE and service user should use demo context for consistency:
+> 💡 **TIP:** Using `{USER}_{DEMO}` prefix is recommended for shared accounts. This prevents naming collisions when multiple users create resources in the same account. The pattern `KAMESHS_MYAPP_RUNNER` clearly identifies the owner and purpose.
 
-| Variable | Pattern | Example (demo=hirc-duckdb-demo) |
+Both SA_ROLE and service user should use user-prefixed demo context for consistency:
+
+| Variable | Pattern | Example (user=KAMESHS, demo=myapp) |
 |----------|---------|--------------------------------|
-| SA_ROLE | `{DEMO}_ACCESS` | `HIRC_DUCKDB_DEMO_ACCESS` |
-| SA_USER | `{DEMO}_RUNNER` | `HIRC_DUCKDB_DEMO_RUNNER` |
+| SA_ROLE | `{USER}_{DEMO}_ACCESS` | `KAMESHS_MYAPP_ACCESS` |
+| SA_USER | `{USER}_{DEMO}_RUNNER` | `KAMESHS_MYAPP_RUNNER` |
 
-**Prompt for skill-specific values with demo-aware defaults:**
+**Prompt for naming preference first:**
+
+Use `ask_user_question`:
+
+```
+Service Account Naming:
+
+💡 TIP: User prefix recommended for shared accounts to avoid collisions.
+
+☑ Use prefix: KAMESHS_MYAPP_RUNNER (recommended)
+☐ No prefix: MYAPP_RUNNER
+```
+
+**Then prompt for skill-specific values with appropriate defaults:**
 
 ```
 PAT Configuration for demo: <DEMO_CONTEXT>
 
-1. Service user name [default: <DEMO>_RUNNER]:
-2. PAT role [default: <DEMO>_ACCESS]:
+1. Service user name [default: <USER>_<DEMO>_RUNNER or <DEMO>_RUNNER based on choice]:
+2. PAT role [default: <USER>_<DEMO>_ACCESS or <DEMO>_ACCESS based on choice]:
 3. Admin role for setup [default: from SA_ADMIN_ROLE in .env, or ACCOUNTADMIN]:
 4. Database for policy objects [default: from SNOW_UTILS_DB]:
 ```
 
 **Auth policy expiry settings (ALWAYS ask user to confirm):**
 
-| Setting | Snowflake Default | Description |
-|---------|-------------------|-------------|
-| Default expiry | 15 days | How long PAT is valid by default |
-| Max expiry | 365 days | Maximum allowed expiry |
+Use `ask_user_question` with preset options:
+
+```
+PAT Expiry Profile:
+
+☐ Default (15/365 days) - Snowflake defaults
+☐ Short (7/30 days) - Tight security, testing
+☐ Medium (30/90 days) - Standard development
+☐ Custom - I'll specify values
+```
+
+| Profile | Default Expiry | Max Expiry | Use Case |
+|---------|---------------|------------|----------|
+| Default | 15 days | 365 days | Snowflake defaults |
+| Short | 7 days | 30 days | Tight security, testing |
+| Medium | 30 days | 90 days | Standard development |
+| Custom | (prompt) | (prompt) | User-specified |
+
+**If user selects "Custom":**
 
 ```
 5. PAT default expiry days [default: 15]:
