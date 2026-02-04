@@ -591,7 +591,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 - Verify auth policy is attached to user
 - Run with `--debug` flag for detailed output
 
-### Step 7: Write Success Summary and Cleanup Manifest
+### Step 7: Write Resource Manifest
 
 **Manifest Location:** `.snow-utils/snow-utils-manifest.md`
 
@@ -606,9 +606,9 @@ mkdir -p .snow-utils
 ```markdown
 # Snow-Utils Manifest
 
-This manifest tracks Snowflake resources created by snow-utils skills.
+This manifest records all Snowflake resources created by snow-utils skills.
 Each skill section is bounded by START/END markers for easy identification.
-CoCo can use this manifest to replay creation or cleanup resources.
+CoCo uses this manifest to track, audit, and cleanup resources.
 
 ---
 ```
@@ -644,7 +644,7 @@ This enables recovery if CoCo loses context mid-creation.
 
 **After each subsequent resource, update status from `pending` to `✓`.**
 
-**After all resources created, update Status to COMPLETE and add cleanup section:**
+**After all resources created, update Status to COMPLETE and add cleanup instructions section:**
 
 ```markdown
 <!-- START -- snow-utils-pat -->
@@ -756,11 +756,25 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 5. **On confirmation:** Execute the CLI command from manifest
 
 6. **After cleanup success:**
-   - Remove the `<!-- START -- snow-utils-pat -->` to `<!-- END -- snow-utils-pat -->` section from manifest
-   - If manifest becomes empty (only header): Optionally delete the file
+   - Update the manifest section: change `Status: COMPLETE` to `Status: REMOVED`
+   - Add removal timestamp: `**Removed:** {TIMESTAMP}`
+   - **DO NOT delete the manifest** - preserve for audit/reference
+   - User can manually delete `.snow-utils/` folder if desired
 
-> **Why manifest-driven?** The manifest captures exact resource names created during setup.
-> Using CLI ensures proper dependency order, syntax, and error handling.
+   Example updated manifest section after cleanup:
+
+   ```markdown
+   ## PAT Resources: {COMMENT_PREFIX}
+
+   **Created:** 2026-02-04 10:30:00
+   **Removed:** 2026-02-04 14:45:00
+   **User:** {SA_USER}
+   **Role:** {SA_ROLE}
+   **Status:** REMOVED
+   ```
+
+> **Why preserve manifest?** The manifest serves as audit trail and reference for recreating resources.
+> User can manually delete if no longer needed.
 
 #### Replay Flow (Single Confirmation)
 
