@@ -58,15 +58,12 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-n
 
 ## Quick Start
 
-1. Start CoCo in your project directory
+1. Start Cortex Code in your project directory
 2. Say: `"Create a network rule for my local IP"`
-3. Follow the prompts to configure and create resources
+3. Follow the prompts
 
-## Prerequisites
-
-- `uv` - Python package manager
-- `snow` - Snowflake CLI
-- Snowflake connection configured
+> [!TIP]
+> The skill checks for required tools and prompts you to install any that are missing.
 
 ## Environment Variables
 

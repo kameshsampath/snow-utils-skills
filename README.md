@@ -35,24 +35,17 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-v
 
 ## Quick Start
 
-### 1. Install Prerequisites
+### 1. Install Cortex Code
+
+Follow the [Cortex Code installation guide](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code).
+
+### 2. Add Skills
 
 ```bash
-# Python package manager
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Snowflake CLI
-uv tool install snowflake-cli
+cortex skill add https://github.com/kameshsampath/snow-utils-skills
 ```
 
-### 2. Configure Snowflake Connection
-
-```bash
-snow connection add
-snow connection test -c <connection_name>
-```
-
-### 3. Use with Cortex Code
+### 3. Use Natural Language
 
 Open Cortex Code and try:
 
@@ -61,6 +54,9 @@ Open Cortex Code and try:
 "Create a network rule for my local IP"
 "Set up an external volume for S3"
 ```
+
+> [!TIP]
+> Skills automatically check for required tools (uv, snow, aws) and prompt you to install any that are missing.
 
 ## Design Principles
 
