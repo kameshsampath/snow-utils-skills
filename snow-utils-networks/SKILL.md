@@ -367,7 +367,7 @@ Then skip to Step 6 (Verify).
 
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
-  rule delete --name <NW_RULE_NAME> --db <NW_RULE_DB>
+  rule delete --name <NW_RULE_NAME> --db <NW_RULE_DB> --yes
 ```
 
 Then continue to Step 4.
@@ -549,7 +549,7 @@ CoCo can use this manifest to replay creation or cleanup resources.
 #### CLI Cleanup (REQUIRED)
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py rule delete --name {NW_RULE_NAME} --db {NW_RULE_DB}
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py rule delete --name {NW_RULE_NAME} --db {NW_RULE_DB} --yes
 ```
 
 #### SQL Reference (FALLBACK ONLY - if CLI unavailable)
