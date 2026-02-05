@@ -1,6 +1,6 @@
 ---
 name: snow-utils-pat
-description: "Create Snowflake Programmatic Access Tokens (PATs) for service accounts. Use when: setting up service user, creating PAT, configuring authentication policy, network policy for PAT. Triggers: programmatic access token, PAT, service account, snowflake authentication."
+description: "Create Snowflake Programmatic Access Tokens (PATs) for service accounts. Use when: setting up service user, creating PAT, configuring authentication policy, network policy for PAT. Triggers: programmatic access token, PAT, service account, snowflake authentication, replay pat, replay pat manifest, recreate pat."
 ---
 
 # Snowflake PAT Setup
@@ -834,19 +834,23 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 > **🚨 GOAL:** Replay is for less technical users who trust the setup. Minimize friction.
 > CoCo constructs summary from manifest (no dry-run needed), gets ONE confirmation, then executes.
 
-**Trigger phrases:** "replay manifest", "replay from manifest", "recreate from manifest", "replay PAT"
+**Trigger phrases:** "replay pat", "replay pat manifest", "recreate pat", "replay from manifest"
 
-> **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (hidden directory - use exact path)
+> **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (in current working directory)
+
+**IMPORTANT:** This is the **snow-utils-pat** skill. Only replay sections marked `<!-- START -- snow-utils-pat -->`. If manifest contains other skills (Volumes, Networks), ignore them - use the appropriate skill for those.
 
 **If user asks to replay/recreate from manifest:**
 
-1. **Read manifest** using exact path `.snow-utils/snow-utils-manifest.md`:
+1. **Read manifest from current project directory:**
 
    ```bash
    cat .snow-utils/snow-utils-manifest.md
    ```
 
 2. **Find section** `<!-- START -- snow-utils-pat -->`
+   - If section NOT found: "No PAT resources in manifest. Nothing to replay for PAT."
+   - If section found: Continue to step 3
 
 3. **Check Status field and act accordingly:**
 

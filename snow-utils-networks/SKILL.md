@@ -622,14 +622,24 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
 #### Replay Flow (Single Confirmation)
 
-**Trigger phrases:** "replay manifest", "replay from manifest", "recreate from manifest", "replay network", "replay network setup"
+**Trigger phrases:** "replay network", "replay network manifest", "recreate network", "replay from manifest"
 
-> **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (hidden directory - use exact path)
+> **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (in current working directory)
+
+**IMPORTANT:** This is the **snow-utils-networks** skill. Only replay sections marked `<!-- START -- snow-utils-networks -->`. If manifest contains other skills (Volumes, PAT), ignore them - use the appropriate skill for those.
 
 **If user asks to replay/recreate from manifest:**
 
-1. **Read manifest** `.snow-utils/snow-utils-manifest.md`
+1. **Read manifest from current project directory:**
+
+   ```bash
+   cat .snow-utils/snow-utils-manifest.md
+   ```
+
 2. **Find section** `<!-- START -- snow-utils-networks:{NW_RULE_NAME} -->`
+   - If section NOT found: "No network resources in manifest. Nothing to replay for networks."
+   - If section found: Continue to step 3
+
 3. **Check Status:**
 
 | Status | Action |
