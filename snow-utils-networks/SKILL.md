@@ -161,10 +161,11 @@ Continue to Step 2a.
 
 | Privilege | Scope | Required For | Default Role |
 |-----------|-------|--------------|--------------|
-| CREATE NETWORK RULE | Schema | Creating network rules | ACCOUNTADMIN, SECURITYADMIN, Schema owner |
+| USAGE | Database | Accessing SNOW_UTILS_DB | DB owner, ACCOUNTADMIN |
+| CREATE NETWORK RULE | Schema | Creating network rules | Schema owner, ACCOUNTADMIN |
 | CREATE NETWORK POLICY | Account | Creating network policies | SECURITYADMIN+ |
 
-> **Note:** SECURITYADMIN or ACCOUNTADMIN has all these privileges by default.
+> **Note:** Only ACCOUNTADMIN has all these privileges by default. SECURITYADMIN lacks USAGE on databases.
 
 **Ensure secured .snow-utils directory:**
 
@@ -199,11 +200,11 @@ Use the same role for network operations?
 - **If Yes:** Use detected role for networks
 - **If No:** Prompt for role (see below)
 
-**If no admin_role set for any skill**, prompt user with `ask_user_question` (type: "text", defaultValue: "SECURITYADMIN"):
+**If no admin_role set for any skill**, prompt user with `ask_user_question` (type: "text", defaultValue: "ACCOUNTADMIN"):
 
 ```
 Admin role for network operations:
-[SECURITYADMIN]
+[ACCOUNTADMIN]
 ```
 
 **IMMEDIATELY write to manifest (before ANY resource creation):**
@@ -221,7 +222,7 @@ Continue to Step 2b.
 
 ### Step 2b: Verify Admin Role Privileges
 
-**If admin_role is NOT SECURITYADMIN or ACCOUNTADMIN**, verify it has required privileges:
+**If admin_role is NOT ACCOUNTADMIN**, verify it has required privileges:
 
 ```bash
 set -a && source .env && set +a && snow sql -q "
@@ -316,7 +317,55 @@ Network rule mode:
 
 **CoCo Conversion:** Selected mode → `--mode <value>`
 
-**Part 2 - IP Sources Selection (multi-select):**
+**Part 1c - Rule Type Selection (mode-dependent):**
+
+> **⚠️ CRITICAL:** Mode and Type have constraints. Use wrong combination = Snowflake error!
+
+**Mode-Type Compatibility Matrix:**
+
+| Mode | Valid Types | Default | Notes |
+|------|-------------|---------|-------|
+| INGRESS | IPV4, AWSVPCEID | IPV4 | IP allowlisting |
+| INTERNAL_STAGE | IPV4, AWSVPCEID | IPV4 | Stage access |
+| EGRESS | HOST_PORT, IPV4 | HOST_PORT | Use HOST_PORT for hostname:port targets |
+| POSTGRES_INGRESS | IPV4, AWSVPCEID | IPV4 | PostgreSQL incoming |
+| POSTGRES_EGRESS | HOST_PORT, IPV4 | HOST_PORT | Use HOST_PORT for hostname:port targets |
+
+**If mode is INGRESS, INTERNAL_STAGE, or POSTGRES_INGRESS:**
+
+Use `ask_user_question` with IPV4 pre-selected:
+
+```
+Rule type:
+
+○ IPV4 (default)
+  IP addresses/CIDR ranges (e.g., 192.168.1.0/24)
+
+○ AWSVPCEID
+  AWS VPC Endpoint IDs
+```
+
+**If mode is EGRESS or POSTGRES_EGRESS:**
+
+Use `ask_user_question` with HOST_PORT pre-selected:
+
+```
+Rule type:
+
+○ HOST_PORT (recommended)
+  Hostname:port targets (e.g., api.github.com:443)
+
+○ IPV4
+  Specific external IP addresses to connect to
+```
+
+**CoCo Conversion:** Selected type → `--type <value>`
+
+**Part 2 - Value Input (type-dependent):**
+
+> **⚠️ IMPORTANT:** IP source presets (--allow-local, --allow-gh, --allow-google) only work with IPV4 type!
+
+**If type is IPV4:** Show IP Sources Selection (multi-select)
 
 Use `ask_user_question` with `multiSelect: true`:
 
@@ -337,7 +386,7 @@ Which IP sources should be allowed access?
   I'll specify IP ranges
 ```
 
-**CoCo Conversion Table:**
+**CoCo Conversion Table (IPV4 only):**
 
 | User Selection | CLI Flag |
 |----------------|----------|
@@ -352,6 +401,24 @@ Which IP sources should be allowed access?
 Enter custom CIDRs (comma-separated):
 Example: 10.0.0.0/8, 192.168.1.0/24
 ```
+
+**If type is HOST_PORT:** Prompt for hostnames directly
+
+```
+Enter hostname:port targets (comma-separated):
+Example: api.github.com:443, storage.googleapis.com:443
+```
+
+**CoCo Conversion:** → `--values "<comma-separated-hosts>"`
+
+**If type is AWSVPCEID:** Prompt for VPC endpoint IDs
+
+```
+Enter AWS VPC Endpoint IDs (comma-separated):
+Example: vpce-1234567890abcdef0
+```
+
+**CoCo Conversion:** → `--values "<comma-separated-vpce-ids>"`
 
 **⚠️ STOP**: Wait for user input on ALL values.
 
@@ -914,12 +981,25 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
   - `INTERNAL_STAGE` - Internal stage access rules
   - `POSTGRES_INGRESS` - PostgreSQL interface incoming
   - `POSTGRES_EGRESS` - PostgreSQL interface outbound
-- `--values`: Comma-separated CIDRs
-- `--allow-local`: Include auto-detected local IP
-- `--allow-gh, -G`: Include GitHub Actions IPs (IPv4 only - see note below)
-- `--allow-google, -g`: Include Google IPs
+- `--type, -t`: Rule type (default depends on mode)
+  - `IPV4` - IP addresses/CIDRs (default for INGRESS modes)
+  - `HOST_PORT` - hostname:port targets (default for EGRESS modes)
+  - `AWSVPCEID` - AWS VPC Endpoint IDs
+- `--values`: Comma-separated values (CIDRs, hosts, or VPC IDs depending on type)
+- `--allow-local`: Include auto-detected local IP **(IPV4 type only)**
+- `--allow-gh, -G`: Include GitHub Actions IPs **(IPV4 type only)**
+- `--allow-google, -g`: Include Google IPs **(IPV4 type only)**
 - `--policy, -p`: Also create network policy
 - `--dry-run`: Preview SQL without executing
+
+**⚠️ Mode-Type Constraints:**
+
+| Mode | Valid Types |
+|------|-------------|
+| INGRESS, INTERNAL_STAGE, POSTGRES_INGRESS | IPV4, AWSVPCEID |
+| EGRESS, POSTGRES_EGRESS | HOST_PORT, IPV4 |
+
+> IP source flags (`--allow-local`, `--allow-gh`, `--allow-google`) only work with `--type IPV4`
 
 **⚠️ IPv4-Only Note for GitHub Actions:**
 
