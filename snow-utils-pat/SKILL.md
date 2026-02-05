@@ -43,6 +43,8 @@ When about to write/edit a sensitive value like `SA_PAT`:
 
 **INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
+**📍 MANIFEST FILE:** `.snow-utils/snow-utils-manifest.md` (ALWAYS this exact path and filename - never search for other patterns like *.yaml or *.*)
+
 **⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) to create the SA infrastructure. It requires admin_role (from manifest, defaults to ACCOUNTADMIN) to create users, network policies, and authentication policies. The output (SA_PAT) is then used by apps/demos to consume resources.
 
 **🔄 IDEMPOTENCY NOTE:** Network rules use `CREATE OR REPLACE` (Snowflake does not support `IF NOT EXISTS` for network rules). Network policies use `CREATE IF NOT EXISTS` to preserve existing policies. Re-running create operations is safe for automation.
@@ -196,6 +198,8 @@ snow_utils_db: <VALUE>
 ### Step 2a: Admin Role from Manifest
 
 **Purpose:** PAT skill requires elevated privileges for account-level objects. Get admin_role from manifest.
+
+> **📍 MANIFEST FILE:** `.snow-utils/snow-utils-manifest.md` - always use this exact path, never search for other patterns
 
 **Required privileges for PAT skill:**
 

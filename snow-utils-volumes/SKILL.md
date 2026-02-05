@@ -17,7 +17,7 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud stor
 
 > **📋 MANIFEST AS SOURCE OF TRUTH**
 >
-> Location: `.snow-utils/snow-utils-manifest.md`
+> **📍 Location:** `.snow-utils/snow-utils-manifest.md` (ALWAYS this exact path - never search for *.yaml or other patterns)
 >
 > **🔒 Security:** Secured like `.ssh` (chmod 700 directory, chmod 600 files)
 >
