@@ -473,6 +473,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 - Write cleanup manifest (see Step 8)
 
 **Note:** External volumes have many applications:
+
 - Iceberg tables (managed data lake)
 - COPY INTO unload (data export)
 - External stages (data import)
@@ -533,14 +534,15 @@ Created: <TIMESTAMP>
 
 ```bash
 # Single command cleans up all resources (Snowflake + AWS)
+# Use --yes for CoCo automation (skips click.confirm prompt)
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} \
-  delete --bucket ${BUCKET}
+  delete --bucket ${BUCKET} --yes --output json
 
 # With S3 bucket deletion (add --force if bucket not empty)
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} \
-  delete --bucket ${BUCKET} --delete-bucket --force
+  delete --bucket ${BUCKET} --delete-bucket --force --yes --output json
 ```
 
 ```
@@ -548,6 +550,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 **Display success summary to user:**
 
 ```
+
 ✅ External Volume Setup Complete!
 
 Resources Created:
@@ -562,11 +565,13 @@ Verification:
   IAM Trust:        Valid
 
 Applications:
-  - Iceberg tables (managed data lake)
-  - COPY INTO unload (data export)  
-  - External stages (data import)
+
+- Iceberg tables (managed data lake)
+- COPY INTO unload (data export)  
+- External stages (data import)
 
 Manifest appended to: .snow-utils/snow-utils-manifest.md
+
 ```
 
 **Example Iceberg Table DDL (one application):**
