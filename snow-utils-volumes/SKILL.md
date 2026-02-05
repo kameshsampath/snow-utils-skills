@@ -441,7 +441,8 @@ CREATE EXTERNAL VOLUME IF NOT EXISTS VOLUME_NAME
             STORAGE_AWS_EXTERNAL_ID = '...'
         )
     )
-    ALLOW_WRITES = TRUE;
+    ALLOW_WRITES = TRUE
+    COMMENT = 'Used by KAMESHS - DEMO app - managed by snow-utils-volumes';
 ```
 
 **FORBIDDEN:** Showing only summary without SQL/JSON. User MUST see BOTH parts on first display.
@@ -614,6 +615,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 - `-r, --region`: AWS region (default: us-west-2, or AWS_REGION env var)
 - `-p, --prefix`: Custom prefix for AWS resources
 - `--no-prefix`: Disable username prefix
+- `-c, --comment`: Comment for external volume (auto-generated if not provided)
 
 **Commands:**
 
