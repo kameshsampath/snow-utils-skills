@@ -469,12 +469,28 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 **On success:**
 
 - Update .env with created volume name
-- Show example Iceberg table DDL
+- Continue to Step 7 (verify)
 - Write cleanup manifest (see Step 8)
+
+**Note:** External volumes have many applications:
+- Iceberg tables (managed data lake)
+- COPY INTO unload (data export)
+- External stages (data import)
+- Data sharing with other platforms
 
 **On failure:** Rollback is automatic. Present error.
 
 ### Step 7: Verify
+
+**⏳ Wait for IAM propagation before verifying:**
+
+```
+Waiting 15 seconds for IAM propagation...
+```
+
+```bash
+sleep 15
+```
 
 **Execute:**
 
@@ -483,7 +499,9 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
   verify --volume-name ${EXTERNAL_VOLUME_NAME}
 ```
 
-**Present** verification result and summary of created resources.
+**If verification fails with IAM error:** Wait another 15 seconds and retry (up to 3 attempts).
+
+**Present** verification result and continue to Step 8 for summary.
 
 ### Step 8: Write Success Summary and Cleanup Manifest
 
@@ -537,8 +555,7 @@ aws s3 rb s3://hirc-duckdb-demo-iceberg --force
 **Display success summary to user:**
 
 ```
-
-External Volume Setup Complete!
+✅ External Volume Setup Complete!
 
 Resources Created:
   S3 Bucket:        hirc-duckdb-demo-iceberg (us-west-2)
@@ -546,8 +563,30 @@ Resources Created:
   IAM Policy:       hirc-duckdb-demo-iceberg-snowflake-policy
   External Volume:  HIRC_DUCKDB_DEMO_ICEBERG_EXTERNAL_VOLUME
 
-Manifest appended to: ./snow-utils-manifest.md
+Verification:
+  Status:           ✅ PASSED
+  Storage Access:   Confirmed
+  IAM Trust:        Valid
 
+Applications:
+  - Iceberg tables (managed data lake)
+  - COPY INTO unload (data export)  
+  - External stages (data import)
+
+Manifest appended to: .snow-utils/snow-utils-manifest.md
+```
+
+**Example Iceberg Table DDL (one application):**
+
+```sql
+CREATE OR REPLACE ICEBERG TABLE my_table (
+    id INT,
+    name STRING,
+    created_at TIMESTAMP
+)
+    CATALOG = 'SNOWFLAKE'
+    EXTERNAL_VOLUME = 'HIRC_DUCKDB_DEMO_ICEBERG_EXTERNAL_VOLUME'
+    BASE_LOCATION = 'my_table/';
 ```
 
 ## Tools
