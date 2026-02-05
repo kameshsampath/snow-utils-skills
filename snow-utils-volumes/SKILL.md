@@ -38,6 +38,7 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud stor
 - NEVER put admin_role in app .env - apps should use SA_ROLE
 - NEVER skip manifest - always update manifest IMMEDIATELY after user input
 - NEVER leave .snow-utils unsecured - always chmod 700/600
+- NEVER delete .snow-utils directory or manifest file - preserve for audit/cleanup/replay
 - If .env values are empty, prompt user or run check_setup.py
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
@@ -312,6 +313,7 @@ Suggested bucket (from project): <project_name>
 **After user enters bucket name, show preview:**
 
 If prefix selected:
+
 ```
 Preview:
   S3 Bucket:        <prefix>-<bucket>
@@ -320,6 +322,7 @@ Preview:
 ```
 
 If no prefix:
+
 ```
 Preview:
   S3 Bucket:        <bucket>
