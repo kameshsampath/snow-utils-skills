@@ -1,6 +1,6 @@
 ---
 name: snow-utils-volumes
-description: "Create Snowflake external volumes with S3 storage. Use when: setting up external storage, creating external volume, configuring S3 for Snowflake, Iceberg tables, unloading data. Triggers: external volume, s3 snowflake, iceberg storage, data lake storage."
+description: "Create Snowflake external volumes with S3 storage. Use when: setting up external storage, creating external volume, configuring S3 for Snowflake, Iceberg tables, unloading data. Triggers: external volume, s3 snowflake, iceberg storage, data lake storage, replay volumes, replay volume manifest, recreate external volume."
 ---
 
 # External Volume Setup (AWS S3)
@@ -696,17 +696,21 @@ extvolume.py --no-prefix create --bucket my-bucket
 
 **Trigger phrases:** "replay manifest", "replay volumes", "recreate external volume", "replay from manifest"
 
-> **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md`
+> **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (in current working directory)
+
+**IMPORTANT:** This is the **snow-utils-volumes** skill. Only replay sections marked `<!-- START -- snow-utils-volumes -->`. If manifest contains other skills (PAT, Networks), ignore them - use the appropriate skill for those.
 
 **If user asks to replay/recreate from manifest:**
 
-1. **Read manifest** using exact path:
+1. **Read manifest from current project directory:**
 
    ```bash
    cat .snow-utils/snow-utils-manifest.md
    ```
 
 2. **Find section** `<!-- START -- snow-utils-volumes -->`
+   - If section NOT found: "No external volume resources in manifest. Nothing to replay for volumes."
+   - If section found: Continue to step 3
 
 3. **Check Status field and act accordingly:**
 
