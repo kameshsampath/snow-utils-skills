@@ -411,7 +411,6 @@ PAT Expiry Profile:
 - `SA_USER=<confirmed_value>`
 - `SA_ROLE=<confirmed_value>`
 
-
 ### Step 3a: Check for Existing PAT
 
 **Check if PAT already exists for the user (using elevated role):**
@@ -1041,7 +1040,7 @@ Manifest updated: .snow-utils/snow-utils-manifest.md
 Proceed with sequential creation? [yes/no]
 ```
 
-6. **On "yes":** Execute each skill's replay in order:
+1. **On "yes":** Execute each skill's replay in order:
 
    **For each skill in timestamp order:**
    - Extract values from that skill's manifest section
@@ -1050,7 +1049,7 @@ Proceed with sequential creation? [yes/no]
    - If ANY skill fails: STOP immediately, report which skill failed
    - Do NOT continue to next skill on failure
 
-7. **On completion:** Display summary:
+2. **On completion:** Display summary:
 
 ```
 ✅ Replay All Complete!
@@ -1190,6 +1189,14 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --output json
+```
+
+**With custom expiry settings:**
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
+  --default-expiry-days 7 --max-expiry-days 30 --output json
 ```
 
 **Options:**

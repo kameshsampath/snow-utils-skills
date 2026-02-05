@@ -806,7 +806,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 Proceed with sequential creation? [yes/no]
 ```
 
-6. **On "yes":** Execute each skill's replay in order:
+1. **On "yes":** Execute each skill's replay in order:
 
    **For each skill in timestamp order:**
    - Extract values from that skill's manifest section
@@ -815,7 +815,7 @@ Proceed with sequential creation? [yes/no]
    - If ANY skill fails: STOP immediately, report which skill failed
    - Do NOT continue to next skill on failure
 
-7. **On completion:** Display summary:
+2. **On completion:** Display summary:
 
 ```
 ✅ Replay All Complete!
