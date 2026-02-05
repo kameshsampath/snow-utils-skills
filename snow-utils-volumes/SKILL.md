@@ -1,11 +1,13 @@
 ---
 name: snow-utils-volumes
-description: "Create Snowflake external volumes for Iceberg tables with S3 storage. Use when: setting up Iceberg storage, creating external volume, configuring S3 for Snowflake. Triggers: iceberg storage, external volume, s3 snowflake, setup iceberg."
+description: "Create Snowflake external volumes with S3 storage. Use when: setting up external storage, creating external volume, configuring S3 for Snowflake, Iceberg tables, unloading data. Triggers: external volume, s3 snowflake, iceberg storage, data lake storage."
 ---
 
-# Iceberg External Volume Setup
+# External Volume Setup (AWS S3)
 
-Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Iceberg tables.
+Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud storage access.
+
+**Use cases:** Iceberg tables, data lake access, COPY INTO unload, external stages.
 
 ## Workflow
 
@@ -271,29 +273,38 @@ set -a && source .env && set +a && snow sql -q "SHOW EXTERNAL VOLUMES LIKE '${EX
 
 ### Step 4: Gather Requirements
 
-Read SNOWFLAKE_USER from .env for default prefix:
+**Get context for defaults:**
 
 ```bash
-grep "^SNOWFLAKE_USER=" .env | cut -d= -f2
+# Get prefix from SNOWFLAKE_USER (lowercase)
+grep "^SNOWFLAKE_USER=" .env | cut -d= -f2 | tr '[:upper:]' '[:lower:]'
+
+# Get project name from current directory for bucket suggestion
+basename "$(pwd)" | tr '[:upper:]' '[:lower:]' | tr '_' '-'
 ```
 
-**Ask user with prefix explanation:**
+**Show prefix and ask user with defaults:**
 
 ```
 External Volume Configuration:
 
+Prefix (from SNOWFLAKE_USER): <prefix_value>
+Suggested bucket (from project): <project_name>
+
 > **Note:** By default, all AWS resources (S3 bucket, IAM role, IAM policy) are prefixed 
-> with your username to avoid naming conflicts in shared AWS accounts.
-> Example: If you enter "iceberg-data" as bucket name with prefix "kameshs":
->   - S3 Bucket: kameshs-iceberg-data
->   - IAM Role: kameshs-iceberg-data-snowflake-role
->   - External Volume: KAMESHS_ICEBERG_DATA_EXTERNAL_VOLUME
+> with your Snowflake username to avoid naming conflicts in shared AWS accounts.
+> 
+> Example with prefix "ksampath" and bucket "my-demo":
+>   - S3 Bucket: ksampath-my-demo
+>   - IAM Role: ksampath-my-demo-snowflake-role
+>   - External Volume: KSAMPATH_MY_DEMO_EXTERNAL_VOLUME
+>
 > You can disable prefixing if you prefer raw names.
 
-1. Bucket name (base name): 
+1. Bucket name (base name) [default: <project_name>]: 
 2. AWS region [default: us-west-2]:
 3. Use username prefix? [Y/n]:
-   - If yes, prefix will be: <SNOWFLAKE_USER>
+   - If yes, prefix will be: <prefix_value>
    - If no, resources will use raw bucket name
 4. Allow writes? [default: yes]:
 ```
