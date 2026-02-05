@@ -537,6 +537,15 @@ This manifest records all Snowflake resources created by snow-utils skills.
 **Region:** {AWS_REGION}
 **Status:** COMPLETE
 
+### AWS Tags (applied to S3, IAM Role, IAM Policy)
+| Tag Key | Value |
+|---------|-------|
+| managed-by | snow-utils-volumes |
+| user | {PREFIX_UPPER} |
+| project | {BUCKET_UPPER} |
+| snowflake-volume | {PREFIX}_{BUCKET}_EXTERNAL_VOLUME |
+
+### Resources
 | # | Type | Name | Location | Status |
 |---|------|------|----------|--------|
 | 1 | S3 Bucket | {PREFIX}-{BUCKET} | AWS ({AWS_REGION}) | DONE |
@@ -706,9 +715,9 @@ extvolume.py --no-prefix create --bucket my-bucket
 | `REMOVED` | Proceed with creation (resources don't exist) |
 | `COMPLETE` | Warn: "Resources already exist. Run 'delete' first or choose 'recreate' to cleanup and recreate." |
 
-4. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
+1. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
 
-5. **If Status is `REMOVED`**, extract values and display summary:
+2. **If Status is `REMOVED`**, extract values and display summary:
 
 ```
 ℹ️  Replay from manifest will create:
@@ -719,6 +728,12 @@ extvolume.py --no-prefix create --bucket my-bucket
     • IAM Role:         {PREFIX}-{BUCKET}-snowflake-role
     • External Volume:  {PREFIX}_{BUCKET}_EXTERNAL_VOLUME
 
+  AWS Tags (applied to all AWS resources):
+    • managed-by:       snow-utils-volumes
+    • user:             {PREFIX_UPPER}
+    • project:          {BUCKET_UPPER}
+    • snowflake-volume: {PREFIX}_{BUCKET}_EXTERNAL_VOLUME
+
   Configuration:
     Prefix:   {PREFIX}
     Bucket:   {BUCKET}
@@ -727,7 +742,7 @@ extvolume.py --no-prefix create --bucket my-bucket
 Proceed with creation? [yes/no]
 ```
 
-6. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
+1. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
 
 ```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
@@ -735,7 +750,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
   create --bucket {BUCKET} --output json
 ```
 
-7. **Update manifest Status** from `REMOVED` to `COMPLETE` after successful creation.
+1. **Update manifest Status** from `REMOVED` to `COMPLETE` after successful creation.
 
 ## Troubleshooting
 
