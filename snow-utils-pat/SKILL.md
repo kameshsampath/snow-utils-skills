@@ -43,13 +43,13 @@ When about to write/edit a sensitive value like `SA_PAT`:
 
 **INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
-**⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) to create the SA infrastructure. It requires SA_ADMIN_ROLE (defaults to ACCOUNTADMIN) to create users, network policies, and authentication policies. The output (SA_PAT) is then used by apps/demos to consume resources.
+**⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) to create the SA infrastructure. It requires admin_role (from manifest, defaults to ACCOUNTADMIN) to create users, network policies, and authentication policies. The output (SA_PAT) is then used by apps/demos to consume resources.
 
 **🔄 IDEMPOTENCY NOTE:** Network rules use `CREATE OR REPLACE` (Snowflake does not support `IF NOT EXISTS` for network rules). Network policies use `CREATE IF NOT EXISTS` to preserve existing policies. Re-running create operations is safe for automation.
 
 **📌 ROLE MODEL:**
 
-- **SA_ADMIN_ROLE** (ACCOUNTADMIN): Creates and owns all objects
+- **admin_role** (from manifest, default ACCOUNTADMIN): Creates and owns all objects
 - **SA_ROLE** (`{PROJECT}_ACCESS`): Consumer-only role for PAT restriction. Apps/demos grant it access to their resources.
 - **SA_USER** (`{PROJECT}_RUNNER`): Service user with PAT, restricted to SA_ROLE
 
@@ -108,7 +108,7 @@ tools_checked: true
    **If .env exists**, merge missing keys from .env.example:
    - Read existing .env
    - Add only keys that don't exist (preserve all existing values)
-   - Keys to check: SNOWFLAKE_DEFAULT_CONNECTION_NAME, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_ACCOUNT_URL, SA_ROLE, SNOW_UTILS_DB, SA_USER, SA_ADMIN_ROLE, LOCAL_IP, SA_PAT
+   - Keys to check: SNOWFLAKE_DEFAULT_CONNECTION_NAME, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_ACCOUNT_URL, SA_ROLE, SNOW_UTILS_DB, SA_USER, LOCAL_IP, SA_PAT
 
 3. **Check connection details in .env:**
 
@@ -193,9 +193,9 @@ infra_ready: true
 snow_utils_db: <VALUE>
 ```
 
-### Step 2a: Check SA_ADMIN_ROLE Privileges
+### Step 2a: Admin Role from Manifest
 
-**This skill requires SA_ADMIN_ROLE to have specific privileges. Check BEFORE proceeding.**
+**Purpose:** PAT skill requires elevated privileges for account-level objects. Get admin_role from manifest.
 
 **Required privileges for PAT skill:**
 
@@ -206,19 +206,90 @@ snow_utils_db: <VALUE>
 | MANAGE GRANTS | Account | Granting role to user | SECURITYADMIN+ |
 | CREATE AUTHENTICATION POLICY | Schema | Creating auth policy | Schema owner |
 
-**Check SA_ADMIN_ROLE from .env:**
+> **Note:** Only ACCOUNTADMIN has ALL these privileges by default.
+
+**Ensure secured .snow-utils directory:**
 
 ```bash
-grep -E "^SA_ADMIN_ROLE=" .env | cut -d= -f2
+mkdir -p .snow-utils && chmod 700 .snow-utils
 ```
 
-**If SA_ADMIN_ROLE is empty, default to ACCOUNTADMIN** (has all required privileges).
-
-**If SA_ADMIN_ROLE is set to a custom role**, verify it has required privileges:
+**Check manifest for existing admin_role:**
 
 ```bash
-set -a && source .env && set +a && snow sql --role ${SA_ADMIN_ROLE:-ACCOUNTADMIN} -q "
-SHOW GRANTS TO ROLE <SA_ADMIN_ROLE>;
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -A1 "## admin_role" | grep "pat:"
+```
+
+**If admin_role exists for pat:** Use it, continue to Step 2b (privilege verification).
+
+**If admin_role NOT set for pat, check other skills:**
+
+```bash
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -E "^(volumes|networks):" | head -1
+```
+
+**If another skill has admin_role, ask user:**
+
+```
+Found admin_role from another skill:
+  volumes: ACCOUNTADMIN
+  
+PAT creation requires CREATE USER + CREATE ROLE + MANAGE GRANTS + CREATE AUTHENTICATION POLICY.
+
+Options:
+1. Use existing: ACCOUNTADMIN
+2. Use Snowflake default: ACCOUNTADMIN
+3. Specify a different role
+```
+
+**If NO admin_role exists anywhere, prompt:**
+
+```
+PAT creation requires these privileges:
+  - CREATE USER (Account)
+  - CREATE ROLE (Account)
+  - MANAGE GRANTS (Account)
+  - CREATE AUTHENTICATION POLICY (Schema)
+
+Snowflake recommends: ACCOUNTADMIN (has all privileges by default)
+
+Enter admin role for PAT [ACCOUNTADMIN]: 
+```
+
+**⚠️ STOP**: Wait for user input.
+
+**IMMEDIATELY write to manifest (before ANY resource creation):**
+
+```bash
+chmod 700 .snow-utils
+
+cat >> .snow-utils/snow-utils-manifest.md << 'EOF'
+
+## admin_role
+pat: <USER_ROLE>
+EOF
+
+chmod 600 .snow-utils/snow-utils-manifest.md
+```
+
+**Update memory:**
+
+```
+Update /memories/snow-utils-prereqs.md:
+pat_admin_role: <USER_ROLE>
+```
+
+Continue to Step 2b.
+
+### Step 2b: Verify Admin Role Privileges
+
+**If admin_role is ACCOUNTADMIN:** Skip verification, continue to Step 3.
+
+**If admin_role is a custom role**, verify it has required privileges:
+
+```bash
+set -a && source .env && set +a && snow sql --role <ADMIN_ROLE> -q "
+SHOW GRANTS TO ROLE <ADMIN_ROLE>;
 " --format json
 ```
 
@@ -236,7 +307,7 @@ SHOW GRANTS TO ROLE <SA_ADMIN_ROLE>;
 | Option | Action |
 |--------|--------|
 | Grant missing privileges | Show GRANT statements for user to execute with elevated role |
-| Use a different role | Prompt for role name with required privileges (default: ACCOUNTADMIN) |
+| Use a different role | Go back to Step 2a to select different role |
 | Cancel | Stop workflow |
 
 **If user chooses "Grant missing privileges":**
@@ -245,33 +316,15 @@ Show SQL for each missing privilege:
 
 ```sql
 -- Run as ACCOUNTADMIN or SECURITYADMIN
-GRANT CREATE USER ON ACCOUNT TO ROLE <SA_ADMIN_ROLE>;
-GRANT CREATE ROLE ON ACCOUNT TO ROLE <SA_ADMIN_ROLE>;
-GRANT MANAGE GRANTS ON ACCOUNT TO ROLE <SA_ADMIN_ROLE>;
-GRANT CREATE AUTHENTICATION POLICY ON SCHEMA <SNOW_UTILS_DB>.POLICIES TO ROLE <SA_ADMIN_ROLE>;
+GRANT CREATE USER ON ACCOUNT TO ROLE <ADMIN_ROLE>;
+GRANT CREATE ROLE ON ACCOUNT TO ROLE <ADMIN_ROLE>;
+GRANT MANAGE GRANTS ON ACCOUNT TO ROLE <ADMIN_ROLE>;
+GRANT CREATE AUTHENTICATION POLICY ON SCHEMA <SNOW_UTILS_DB>.POLICIES TO ROLE <ADMIN_ROLE>;
 ```
 
-**STOP**: Wait for user to confirm privileges have been granted, then re-check.
-
-**If user chooses "Use a different role":**
-
-Use `ask_user_question` with `type: "text"`:
-
-```
-Enter role with required privileges:
-[ACCOUNTADMIN]
-```
-
-Update .env with the provided role:
-
-```bash
-# Update SA_ADMIN_ROLE in .env
-sed -i '' 's/^SA_ADMIN_ROLE=.*/SA_ADMIN_ROLE=<USER_PROVIDED_ROLE>/' .env
-```
+**STOP**: Wait for user to confirm privileges have been granted, then re-verify.
 
 Continue to Step 3.
-
-**If SA_ADMIN_ROLE=ACCOUNTADMIN (default):** All privileges are available, continue to Step 3.
 
 ### Step 3: Gather Requirements (User-Prefixed Demo-Context Naming)
 
@@ -320,7 +373,7 @@ PAT Configuration for demo: <DEMO_CONTEXT>
 
 1. Service user name [default: <USER>_<DEMO>_RUNNER or <DEMO>_RUNNER based on choice]:
 2. PAT role [default: <USER>_<DEMO>_ACCESS or <DEMO>_ACCESS based on choice]:
-3. Admin role for setup [default: from SA_ADMIN_ROLE in .env, or ACCOUNTADMIN]:
+3. Admin role for setup [default: from manifest, or ACCOUNTADMIN]:
 4. Database for policy objects [default: from SNOW_UTILS_DB]:
 ```
 
@@ -357,17 +410,17 @@ PAT Expiry Profile:
 
 - `SA_USER=<confirmed_value>`
 - `SA_ROLE=<confirmed_value>`
-- `SA_ADMIN_ROLE=<confirmed_value>`
+
 
 ### Step 3a: Check for Existing PAT
 
 **Check if PAT already exists for the user (using elevated role):**
 
 ```bash
-set -a && source .env && set +a && snow sql --role ${SA_ADMIN_ROLE:-ACCOUNTADMIN} -q "SHOW USER PATS FOR USER <SA_USER>" --format json
+set -a && source .env && set +a && snow sql --role <ADMIN_ROLE> -q "SHOW USER PATS FOR USER <SA_USER>" --format json
 ```
 
-> ⚠️ **IMPORTANT:** All account-level operations from this step onwards MUST use `--role ${SA_ADMIN_ROLE:-ACCOUNTADMIN}` to ensure proper privileges.
+> ⚠️ **IMPORTANT:** All account-level operations from this step onwards MUST use `--role <ADMIN_ROLE>` (from manifest) to ensure proper privileges.
 
 **If PAT exists**, use `ask_user_question` to ask:
 
@@ -429,15 +482,15 @@ Resources to create:
 
 ```sql
 -- Step 1: Create service user
--- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
-USE ROLE <SA_ADMIN_ROLE>;
+-- Uses admin_role from manifest (defaults to ACCOUNTADMIN)
+USE ROLE <ADMIN_ROLE>;
 CREATE USER IF NOT EXISTS HIRC_DUCKDB_DEMO_RUNNER
     TYPE = SERVICE
     COMMENT = 'HIRC_DUCKDB_DEMO service account - managed by snow-utils-pat';
 GRANT ROLE HIRC_DUCKDB_DEMO_ACCESS TO USER HIRC_DUCKDB_DEMO_RUNNER;
 
 -- Step 2: Create network rule and policy
-USE ROLE <SA_ADMIN_ROLE>;
+USE ROLE <ADMIN_ROLE>;
 CREATE NETWORK RULE KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE
     MODE = INGRESS
     TYPE = IPV4
@@ -445,7 +498,7 @@ CREATE NETWORK RULE KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_
     COMMENT = 'HIRC_DUCKDB_DEMO network rule - managed by snow-utils-pat';
 
 -- Step 3: Create authentication policy
-USE ROLE <SA_ADMIN_ROLE>;
+USE ROLE <ADMIN_ROLE>;
 CREATE SCHEMA IF NOT EXISTS KAMESHS_SNOW_UTILS.POLICIES;
 CREATE OR ALTER AUTHENTICATION POLICY KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY
     AUTHENTICATION_METHODS = ('PROGRAMMATIC_ACCESS_TOKEN')
@@ -737,7 +790,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 <summary>Manual SQL cleanup (dependency order - reverse of creation)</summary>
 
 ```sql
-USE ROLE {SA_ADMIN_ROLE};
+USE ROLE {ADMIN_ROLE};
 -- 1. Remove PAT first (depends on user)
 ALTER USER {SA_USER} REMOVE PAT {SA_USER}_PAT;
 -- 2. Unassign auth policy (MUST do before drop)
@@ -1145,7 +1198,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 |--------|----------|---------|-------------|
 | `--user` | Yes | - | Service user name |
 | `--role` | Yes | - | PAT role restriction |
-| `--admin-role` | No | SA_ADMIN_ROLE env | Role for creating policies |
+| `--admin-role` | No | From manifest | Role for creating policies |
 | `--db` | Yes | - | Database for policy objects |
 | `--dry-run` | No | false | Preview SQL without executing |
 | `--output json` | No | text | Machine-readable output |
@@ -1169,7 +1222,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 |--------|----------|---------|-------------|
 | `--user` | Yes | - | Service user to remove |
 | `--db` | Yes | - | Database containing policies |
-| `--admin-role` | No | SA_ADMIN_ROLE env | Role for dropping resources |
+| `--admin-role` | No | From manifest | Role for dropping resources |
 | `--dry-run` | No | false | Preview DROP statements |
 
 #### rotate
@@ -1187,7 +1240,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 |--------|----------|---------|-------------|
 | `--user` | Yes | - | Service user with existing PAT |
 | `--role` | Yes | - | Role restriction for new PAT |
-| `--admin-role` | No | SA_ADMIN_ROLE env | Role for rotation |
+| `--admin-role` | No | From manifest | Role for rotation |
 
 **After rotation:** Updates SA_PAT in .env with new token.
 
