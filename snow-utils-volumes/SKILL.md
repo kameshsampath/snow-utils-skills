@@ -9,17 +9,32 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Ice
 
 ## Workflow
 
-**⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) for all operations. External volumes are account-level objects requiring SA_ADMIN_ROLE (defaults to ACCOUNTADMIN). SA_ROLE is a consumer-only role - apps/demos grant it USAGE on their Iceberg tables.
+**⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) for all operations. External volumes are account-level objects requiring elevated privileges (default: ACCOUNTADMIN).
 
-**📋 NO PREREQUISITE:** This skill does NOT require snow-utils-pat. It operates independently using the user's connection with SA_ADMIN_ROLE privileges.
+**📋 NO PREREQUISITE:** This skill does NOT require snow-utils-pat. It operates independently using the user's connection.
+
+> **📋 MANIFEST AS SOURCE OF TRUTH**
+> 
+> Location: `.snow-utils/snow-utils-manifest.md`
+> 
+> **🔒 Security:** Secured like `.ssh` (chmod 700 directory, chmod 600 files)
+> 
+> **Skill-Scoped Admin Roles:**
+> - Volumes default: `ACCOUNTADMIN` (CREATE EXTERNAL VOLUME privilege)
+> - Cross-skill awareness: Can inherit from PAT/Networks if set
+> - **Apps should NOT use admin_role** - use SA_ROLE instead
 
 **🚫 FORBIDDEN ACTIONS - NEVER DO THESE:**
 
 - NEVER run SQL queries to discover/find/check values (no SHOW ROLES, SHOW DATABASES, SHOW EXTERNAL VOLUMES)
 - NEVER auto-populate empty .env values by querying Snowflake
-- NEVER use flags that bypass user interaction: `--yes`, `-y`, `--auto-setup`, `--auto-approve`, `--quiet`, `--force`, `--non-interactive`
+- NEVER use flags that bypass user interaction (except documented `--yes` for CoCo automation)
 - NEVER assume user consent - always ask and wait for explicit confirmation
 - NEVER skip SQL/JSON in dry-run output - always show BOTH summary AND full SQL/JSON
+- NEVER hardcode admin roles - get admin_role from manifest
+- NEVER put admin_role in app .env - apps should use SA_ROLE
+- NEVER skip manifest - always update manifest IMMEDIATELY after user input
+- NEVER leave .snow-utils unsecured - always chmod 700/600
 - If .env values are empty, prompt user or run check_setup.py
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
@@ -155,7 +170,81 @@ tools_checked: true
 connection_verified: true
 ```
 
-Continue to Step 3.
+Continue to Step 2a.
+
+### Step 2a: Admin Role from Manifest
+
+**Purpose:** Skills require elevated privileges for account-level objects. Get admin_role from manifest.
+
+**Ensure secured .snow-utils directory:**
+
+```bash
+mkdir -p .snow-utils && chmod 700 .snow-utils
+```
+
+**Check manifest for existing admin_role:**
+
+```bash
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -A1 "## admin_role" | grep "volumes:"
+```
+
+**If admin_role exists for volumes:** Use it.
+
+**If admin_role NOT set for volumes, check other skills:**
+
+```bash
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -E "^(pat|networks):" | head -1
+```
+
+**If another skill has admin_role, ask user:**
+
+```
+Found admin_role from another skill:
+  pat: USERADMIN
+  
+External volume creation requires ACCOUNTADMIN (CREATE EXTERNAL VOLUME privilege).
+
+Options:
+1. Use existing: USERADMIN (may need GRANT CREATE EXTERNAL VOLUME)
+2. Use Snowflake default: ACCOUNTADMIN
+3. Specify a different role
+```
+
+**If NO admin_role exists anywhere, prompt:**
+
+```
+External volume creation requires CREATE EXTERNAL VOLUME privilege.
+
+Snowflake recommends: ACCOUNTADMIN (has this privilege by default)
+
+Enter admin role for volumes [ACCOUNTADMIN]: 
+```
+
+**⚠️ STOP**: Wait for user input.
+
+**IMMEDIATELY write to manifest (before ANY resource creation):**
+
+```bash
+# Secure the directory
+chmod 700 .snow-utils
+
+# Create/update manifest
+cat >> .snow-utils/snow-utils-manifest.md << 'EOF'
+
+## admin_role
+volumes: <USER_ROLE>
+EOF
+
+# Secure the file
+chmod 600 .snow-utils/snow-utils-manifest.md
+```
+
+**Update memory:**
+
+```
+Update /memories/snow-utils-prereqs.md:
+volumes_admin_role: <USER_ROLE>
+```
 
 ### Step 3: Check Existing External Volume
 
@@ -382,8 +471,8 @@ Created: <TIMESTAMP>
 
 ```sql
 -- 1. Drop external volume (Snowflake)
--- Uses SA_ADMIN_ROLE from .env (defaults to ACCOUNTADMIN)
-USE ROLE <SA_ADMIN_ROLE>;
+-- Uses admin_role from .snow-utils/snow-utils-manifest.md
+USE ROLE <admin_role>;  -- e.g., ACCOUNTADMIN
 DROP EXTERNAL VOLUME IF EXISTS HIRC_DUCKDB_DEMO_ICEBERG_EXTERNAL_VOLUME;
 ```
 
@@ -494,3 +583,33 @@ extvolume.py --no-prefix create --bucket my-bucket
 **S3 403 error:** Bucket name exists in another account. Choose different name.
 
 **Trust policy mismatch:** Run `update-trust` to re-sync.
+
+## Privilege Escalation Hints (for Apps)
+
+**Background:** Apps using snow-utils resources should operate with restricted SA_ROLE. However, some operations genuinely require elevated privileges.
+
+**If an app needs elevated access, suggest these patterns:**
+
+| App Need | Recommended Approach |
+|----------|---------------------|
+| Create Iceberg tables | Grant CREATE ICEBERG TABLE on schema to SA_ROLE |
+| Modify external volume | Use admin_role from manifest for one-time setup |
+| Grant USAGE to other roles | Stored procedure with CALLER rights + admin_role |
+
+**Example: Stored procedure for controlled escalation:**
+
+```sql
+-- Created once by admin, used by SA_ROLE
+CREATE OR REPLACE PROCEDURE grant_iceberg_usage(target_role STRING)
+RETURNS STRING
+LANGUAGE SQL
+EXECUTE AS CALLER
+AS
+BEGIN
+    -- SA_ROLE calls this, but it runs as admin_role
+    GRANT USAGE ON EXTERNAL VOLUME <VOLUME_NAME> TO ROLE IDENTIFIER(:target_role);
+    RETURN 'Granted USAGE to ' || :target_role;
+END;
+```
+
+**IMPORTANT:** Never suggest putting admin_role in app .env. Always delegate to manifest.
