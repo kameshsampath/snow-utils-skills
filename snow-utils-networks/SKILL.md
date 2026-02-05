@@ -291,6 +291,31 @@ Network Rule Configuration:
 4. Create network policy? (name if yes):
 ```
 
+**Part 1b - Rule Mode Selection:**
+
+Use `ask_user_question` with options (INGRESS pre-selected as default):
+
+```
+Network rule mode:
+
+○ INGRESS (default)
+  Control who can connect TO Snowflake
+
+○ EGRESS
+  Control what Snowflake can connect TO (external access)
+
+○ INTERNAL_STAGE
+  Internal stage access rules
+
+○ POSTGRES_INGRESS
+  PostgreSQL interface - incoming (Iceberg, external tables)
+
+○ POSTGRES_EGRESS
+  PostgreSQL interface - outbound
+```
+
+**CoCo Conversion:** Selected mode → `--mode <value>`
+
 **Part 2 - IP Sources Selection (multi-select):**
 
 Use `ask_user_question` with `multiSelect: true`:
@@ -883,7 +908,12 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 - `--name, -n`: Network rule name (required)
 - `--db`: Database for rule (required)
 - `--schema, -s`: Schema (default: NETWORKS)
-- `--mode, -m`: INGRESS or EGRESS (default: INGRESS)
+- `--mode, -m`: Rule mode (default: INGRESS)
+  - `INGRESS` - Control who can connect TO Snowflake
+  - `EGRESS` - Control what Snowflake can connect TO
+  - `INTERNAL_STAGE` - Internal stage access rules
+  - `POSTGRES_INGRESS` - PostgreSQL interface incoming
+  - `POSTGRES_EGRESS` - PostgreSQL interface outbound
 - `--values`: Comma-separated CIDRs
 - `--allow-local`: Include auto-detected local IP
 - `--allow-gh, -G`: Include GitHub Actions IPs (IPv4 only - see note below)
