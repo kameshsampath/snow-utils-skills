@@ -293,42 +293,46 @@ Detected prefix (from SNOWFLAKE_USER): <prefix_value>
 
 > **Note:** By default, all AWS resources (S3 bucket, IAM role, IAM policy) are prefixed 
 > with your Snowflake username to avoid naming conflicts in shared AWS accounts.
-> You can disable prefixing if you prefer raw names.
 
-1. Use username prefix? [Y/n]:
-   - If yes, prefix will be: <prefix_value>
-   - If no, resources will use raw bucket name
+1. Prefix option:
+   - Use detected prefix: <prefix_value>
+   - Use custom prefix: (specify your own)
+   - No prefix: (use raw bucket name)
 ```
 
-**⚠️ STOP**: Wait for user input.
+**⚠️ STOP**: Wait for user to select prefix option.
 
-**Step 4b: Ask for bucket name (show preview with prefix if selected):**
+**Step 4b: Ask for bucket name (show WITH prefix applied):**
+
+If user selected prefix (detected or custom), show bucket input WITH preview:
 
 ```
+Prefix selected: <prefix_value>
 Suggested bucket (from project): <project_name>
 
 2. Bucket name (base name) [default: <project_name>]: 
+
+With your prefix, resources will be:
+  S3 Bucket:        <prefix>-<project_name>
+  IAM Role:         <prefix>-<project_name>-snowflake-role  
+  External Volume:  <PREFIX>_<PROJECT_NAME>_EXTERNAL_VOLUME
 ```
 
-**After user enters bucket name, show preview:**
-
-If prefix selected:
+If user selected no prefix:
 
 ```
-Preview:
-  S3 Bucket:        <prefix>-<bucket>
-  IAM Role:         <prefix>-<bucket>-snowflake-role
-  External Volume:  <PREFIX>_<BUCKET>_EXTERNAL_VOLUME
+No prefix selected (raw names)
+Suggested bucket (from project): <project_name>
+
+2. Bucket name [default: <project_name>]: 
+
+Resources will be:
+  S3 Bucket:        <project_name>
+  IAM Role:         <project_name>-snowflake-role
+  External Volume:  <PROJECT_NAME>_EXTERNAL_VOLUME
 ```
 
-If no prefix:
-
-```
-Preview:
-  S3 Bucket:        <bucket>
-  IAM Role:         <bucket>-snowflake-role
-  External Volume:  <BUCKET>_EXTERNAL_VOLUME
-```
+**⚠️ STOP**: Wait for user input. After bucket entered, update preview with actual bucket name.
 
 **Step 4c: Ask remaining options:**
 
