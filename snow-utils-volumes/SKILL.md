@@ -507,58 +507,85 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 
 ### Step 8: Write Success Summary and Cleanup Manifest
 
-**After successful creation, append to `snow-utils-manifest.md` in project directory.**
+**Manifest Location:** `.snow-utils/snow-utils-manifest.md`
 
-If file doesn't exist, create with header:
+**Create directory if needed:**
+
+```bash
+mkdir -p .snow-utils && chmod 700 .snow-utils
+```
+
+**If manifest doesn't exist, create with header:**
 
 ```markdown
 # Snow-Utils Manifest
 
-This manifest tracks resources created by snow-utils skills.
-Each section can be cleaned up independently.
+This manifest records all Snowflake resources created by snow-utils skills.
+
+---
 ```
 
-**Append skill section:**
+**Append skill section with START/END markers:**
 
 ```markdown
-## snow-utils-volumes
-Created: <TIMESTAMP>
+<!-- START -- snow-utils-volumes -->
+## External Volume Resources: {COMMENT_PREFIX}
 
-| Type | Name | Location |
-|------|------|----------|
-| S3 Bucket | hirc-duckdb-demo-iceberg | AWS (us-west-2) |
-| IAM Role | hirc-duckdb-demo-iceberg-snowflake-role | AWS |
-| IAM Policy | hirc-duckdb-demo-iceberg-snowflake-policy | AWS |
-| External Volume | HIRC_DUCKDB_DEMO_ICEBERG_EXTERNAL_VOLUME | Snowflake (account-level) |
+**Created:** {TIMESTAMP}
+**Prefix:** {PREFIX}
+**Bucket:** {BUCKET}
+**Region:** {AWS_REGION}
+**Status:** COMPLETE
+
+| # | Type | Name | Location | Status |
+|---|------|------|----------|--------|
+| 1 | S3 Bucket | {PREFIX}-{BUCKET} | AWS ({AWS_REGION}) | DONE |
+| 2 | IAM Policy | {PREFIX}-{BUCKET}-snowflake-policy | AWS | DONE |
+| 3 | IAM Role | {PREFIX}-{BUCKET}-snowflake-role | AWS | DONE |
+| 4 | External Volume | {PREFIX}_{BUCKET}_EXTERNAL_VOLUME | Snowflake | DONE |
 
 ### Cleanup
 
+Run this command to remove all resources:
+
 ```bash
-# Single command cleans up all resources (Snowflake + AWS)
-# Use --yes for CoCo automation (skips click.confirm prompt)
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} \
   delete --bucket ${BUCKET} --yes --output json
+```
 
-# With S3 bucket deletion (add --force if bucket not empty)
+With S3 bucket deletion:
+
+```bash
 set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} \
   delete --bucket ${BUCKET} --delete-bucket --force --yes --output json
 ```
+<!-- END -- snow-utils-volumes -->
+```
 
+**Secure manifest file:**
+
+```bash
+chmod 600 .snow-utils/snow-utils-manifest.md
 ```
 
 **Display success summary to user:**
 
 ```
-
 ✅ External Volume Setup Complete!
 
 Resources Created:
-  S3 Bucket:        hirc-duckdb-demo-iceberg (us-west-2)
-  IAM Role:         hirc-duckdb-demo-iceberg-snowflake-role
-  IAM Policy:       hirc-duckdb-demo-iceberg-snowflake-policy
-  External Volume:  HIRC_DUCKDB_DEMO_ICEBERG_EXTERNAL_VOLUME
+  S3 Bucket:        {PREFIX}-{BUCKET} ({AWS_REGION})
+  IAM Role:         {PREFIX}-{BUCKET}-snowflake-role
+  IAM Policy:       {PREFIX}-{BUCKET}-snowflake-policy
+  External Volume:  {PREFIX}_{BUCKET}_EXTERNAL_VOLUME
+
+AWS Tags Applied:
+  managed-by:       snow-utils-volumes
+  user:             {PREFIX}
+  project:          {BUCKET}
+  snowflake-volume: {VOLUME_NAME}
 
 Verification:
   Status:           ✅ PASSED
@@ -566,13 +593,11 @@ Verification:
   IAM Trust:        Valid
 
 Applications:
+  - Iceberg tables (managed data lake)
+  - COPY INTO unload (data export)
+  - External stages (data import)
 
-- Iceberg tables (managed data lake)
-- COPY INTO unload (data export)  
-- External stages (data import)
-
-Manifest appended to: .snow-utils/snow-utils-manifest.md
-
+Manifest: .snow-utils/snow-utils-manifest.md
 ```
 
 **Example Iceberg Table DDL (one application):**
@@ -654,6 +679,63 @@ extvolume.py --no-prefix create --bucket my-bucket
 - IAM role with Snowflake trust policy
 - Snowflake external volume
 - Updated .env with all values
+
+## Replay Flow (Minimal Approvals)
+
+> **🚨 GOAL:** Replay is for less technical users who trust the setup. Minimize friction.
+> CoCo constructs summary from manifest (no dry-run needed), gets ONE confirmation, then executes.
+
+**Trigger phrases:** "replay manifest", "replay volumes", "recreate external volume", "replay from manifest"
+
+> **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md`
+
+**If user asks to replay/recreate from manifest:**
+
+1. **Read manifest** using exact path:
+
+   ```bash
+   cat .snow-utils/snow-utils-manifest.md
+   ```
+
+2. **Find section** `<!-- START -- snow-utils-volumes -->`
+
+3. **Check Status field and act accordingly:**
+
+| Status | Action |
+|--------|--------|
+| `REMOVED` | Proceed with creation (resources don't exist) |
+| `COMPLETE` | Warn: "Resources already exist. Run 'delete' first or choose 'recreate' to cleanup and recreate." |
+
+4. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
+
+5. **If Status is `REMOVED`**, extract values and display summary:
+
+```
+ℹ️  Replay from manifest will create:
+
+  Resources:
+    • S3 Bucket:        {PREFIX}-{BUCKET}
+    • IAM Policy:       {PREFIX}-{BUCKET}-snowflake-policy
+    • IAM Role:         {PREFIX}-{BUCKET}-snowflake-role
+    • External Volume:  {PREFIX}_{BUCKET}_EXTERNAL_VOLUME
+
+  Configuration:
+    Prefix:   {PREFIX}
+    Bucket:   {BUCKET}
+    Region:   {AWS_REGION}
+
+Proceed with creation? [yes/no]
+```
+
+6. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
+
+```bash
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  --region {AWS_REGION} \
+  create --bucket {BUCKET} --output json
+```
+
+7. **Update manifest Status** from `REMOVED` to `COMPLETE` after successful creation.
 
 ## Troubleshooting
 
