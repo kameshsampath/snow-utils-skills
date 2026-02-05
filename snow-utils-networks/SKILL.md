@@ -294,6 +294,8 @@ Network Rule Configuration:
 
 **Part 1b - Rule Mode Selection:**
 
+> **Note:** ask_user_question supports max 4 options. POSTGRES modes are grouped.
+
 Use `ask_user_question` with options (INGRESS pre-selected as default):
 
 ```
@@ -308,11 +310,20 @@ Network rule mode:
 ○ INTERNAL_STAGE
   Internal stage access rules
 
-○ POSTGRES_INGRESS
-  PostgreSQL interface - incoming (Iceberg, external tables)
+○ POSTGRES
+  PostgreSQL interface (Iceberg, external tables)
+```
+
+**If user selects POSTGRES:** Follow-up with direction question:
+
+```
+PostgreSQL interface direction:
+
+○ POSTGRES_INGRESS (default)
+  Incoming connections to PostgreSQL interface
 
 ○ POSTGRES_EGRESS
-  PostgreSQL interface - outbound
+  Outbound connections from PostgreSQL interface
 ```
 
 **CoCo Conversion:** Selected mode → `--mode <value>`
