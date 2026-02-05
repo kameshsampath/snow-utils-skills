@@ -1,6 +1,6 @@
 ---
 name: snow-utils-pat
-description: "Create Snowflake Programmatic Access Tokens (PATs) for service accounts. Use when: setting up service user, creating PAT, configuring authentication policy, network policy for PAT. Triggers: programmatic access token, PAT, service account, snowflake authentication, replay pat, replay pat manifest, recreate pat."
+description: "Create Snowflake Programmatic Access Tokens (PATs) for service accounts. Use when: setting up service user, creating PAT, configuring authentication policy, network policy for PAT. Triggers: programmatic access token, PAT, service account, snowflake authentication, replay pat, replay pat manifest, recreate pat, replay all manifests, replay all snow-utils."
 ---
 
 # Snowflake PAT Setup
@@ -936,6 +936,89 @@ Resources Created:
 
 Manifest updated: .snow-utils/snow-utils-manifest.md
 
+```
+
+## Replay All Flow (Multi-Skill Sequential)
+
+**Trigger phrases:** "replay all manifests", "replay all snow-utils", "recreate all from manifest"
+
+> **Purpose:** Replay ALL skills from manifest in timestamp order. Safer than individual replay when dependencies exist.
+
+**If user asks to replay all:**
+
+1. **Read manifest from current project directory:**
+
+   ```bash
+   cat .snow-utils/snow-utils-manifest.md
+   ```
+
+2. **Find ALL skill sections** matching `<!-- START -- snow-utils-* -->`
+
+3. **Extract Created timestamp from each section** and sort ascending:
+
+   ```
+   Found 3 skill sections:
+   
+   | # | Skill | Created | Status |
+   |---|-------|---------|--------|
+   | 1 | snow-utils-networks | 2026-02-04T14:30:00 | REMOVED |
+   | 2 | snow-utils-pat | 2026-02-04T14:35:00 | REMOVED |
+   | 3 | snow-utils-volumes | 2026-02-04T15:00:00 | REMOVED |
+   ```
+
+4. **Check all statuses:**
+   - If ANY section has `Status: COMPLETE`: Warn user which skills already exist
+   - If ANY section has `Status: IN_PROGRESS`: Warn user to resume that skill first
+   - Only proceed if ALL sections have `Status: REMOVED`
+
+5. **Display replay plan with single confirmation:**
+
+```
+ℹ️  Replay All will recreate resources in original order:
+
+  1. Networks (2026-02-04T14:30:00)
+     → Network Rule, Network Policy
+  
+  2. PAT (2026-02-04T14:35:00)
+     → Service User, Auth Policy, PAT
+  
+  3. Volumes (2026-02-04T15:00:00)
+     → S3 Bucket, IAM Role, External Volume
+
+Proceed with sequential creation? [yes/no]
+```
+
+6. **On "yes":** Execute each skill's replay in order:
+
+   **For each skill in timestamp order:**
+   - Extract values from that skill's manifest section
+   - Execute the appropriate create command
+   - Update that section's status to `COMPLETE`
+   - If ANY skill fails: STOP immediately, report which skill failed
+   - Do NOT continue to next skill on failure
+
+7. **On completion:** Display summary:
+
+```
+✅ Replay All Complete!
+
+  ✓ Networks:  COMPLETE
+  ✓ PAT:       COMPLETE  
+  ✓ Volumes:   COMPLETE
+
+All resources recreated successfully.
+```
+
+**On failure:**
+
+```
+❌ Replay All Failed at: PAT
+
+  ✓ Networks:  COMPLETE (rolled back: NO)
+  ✗ PAT:       FAILED - <error message>
+  - Volumes:   SKIPPED
+
+Fix the PAT issue, then run "replay all" again to continue.
 ```
 
 ## PAT Security

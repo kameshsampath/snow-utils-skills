@@ -52,6 +52,8 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-v
 "Replay volume manifest"
 "Recreate external volume"
 "Replay volume setup from manifest"
+"Replay all manifests"         # Replays ALL skills in timestamp order
+"Replay all snow-utils"        # Same as above
 ```
 
 ## Quick Start

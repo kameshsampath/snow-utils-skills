@@ -56,6 +56,8 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-p
 "Recreate pat"
 "Replay PAT setup from manifest"
 "Resume PAT setup"
+"Replay all manifests"         # Replays ALL skills in timestamp order
+"Replay all snow-utils"        # Same as above
 ```
 
 ## Quick Start
