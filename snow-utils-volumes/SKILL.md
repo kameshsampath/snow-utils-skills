@@ -14,12 +14,13 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for Apache Ice
 **📋 NO PREREQUISITE:** This skill does NOT require snow-utils-pat. It operates independently using the user's connection.
 
 > **📋 MANIFEST AS SOURCE OF TRUTH**
-> 
+>
 > Location: `.snow-utils/snow-utils-manifest.md`
-> 
+>
 > **🔒 Security:** Secured like `.ssh` (chmod 700 directory, chmod 600 files)
-> 
+>
 > **Skill-Scoped Admin Roles:**
+>
 > - Volumes default: `ACCOUNTADMIN` (CREATE EXTERNAL VOLUME privilege)
 > - Cross-skill awareness: Can inherit from PAT/Networks if set
 > - **Apps should NOT use admin_role** - use SA_ROLE instead
