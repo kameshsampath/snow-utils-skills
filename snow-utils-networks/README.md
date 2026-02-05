@@ -16,7 +16,7 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-n
 - **GitHub Actions IPs** - Allowlist GitHub Actions runner IPs for CI/CD pipelines
 - **Google Cloud IPs** - Allowlist GCP services (Cloud Run, GKE, Compute Engine)
 - **Custom CIDRs** - Specify custom IP ranges for production environments
-- **Smart Admin Role Detection** - Detects SA_ADMIN_ROLE from PAT skill if available
+- **Manifest-Based Admin Role** - Stores admin_role in manifest, can reuse from other skills
 - **Manifest Tracking** - Records resources for replay, audit, and cleanup
 
 ## Sample Prompts
@@ -74,13 +74,12 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-n
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SNOWFLAKE_DEFAULT_CONNECTION_NAME` | Snowflake connection to use | (required) |
-| `NW_ADMIN_ROLE` | Admin role for network operations | ACCOUNTADMIN |
 | `NW_RULE_NAME` | Network rule name | (prompted) |
 | `NW_RULE_DB` | Database for network rules | (prompted) |
 | `NW_RULE_SCHEMA` | Schema for network rules | NETWORKS |
 
 > [!TIP]
-> If you've already run the PAT skill, Networks will detect `SA_ADMIN_ROLE` and offer to reuse it for `NW_ADMIN_ROLE`.
+> **Admin role** is stored in `.snow-utils/snow-utils-manifest.md` (not in .env). If you've already run the PAT or Volumes skill, Networks will offer to reuse their admin_role.
 
 ## Resources Created
 
