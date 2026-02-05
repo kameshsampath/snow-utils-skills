@@ -51,8 +51,10 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-p
 ### Manifest Operations
 
 ```
+"Replay pat"
+"Replay pat manifest"
+"Recreate pat"
 "Replay PAT setup from manifest"
-"Recreate service account from manifest"
 "Resume PAT setup"
 ```
 

@@ -51,8 +51,10 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-n
 ### Manifest Operations
 
 ```
+"Replay network"
+"Replay network manifest"
+"Recreate network"
 "Replay network setup from manifest"
-"Recreate network resources"
 "Resume network setup"
 ```
 

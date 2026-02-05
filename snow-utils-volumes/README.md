@@ -48,8 +48,10 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-v
 ### Manifest Operations
 
 ```
-"Replay volume setup from manifest"
+"Replay volumes"
+"Replay volume manifest"
 "Recreate external volume"
+"Replay volume setup from manifest"
 ```
 
 ## Quick Start
