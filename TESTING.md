@@ -1,6 +1,6 @@
 # Snow-Utils Skills Testing Guide
 
-This document tracks test scenarios for PAT and Networks skills.
+This document tracks test scenarios for PAT, Networks, and Volumes skills.
 
 ## Prerequisites
 
@@ -69,6 +69,47 @@ This document tracks test scenarios for PAT and Networks skills.
 
 ---
 
+## Volumes Skill Tests
+
+### Phase 1: Fresh Creation
+
+| # | Feature | Test Command / Prompt | Expected Behavior | Status |
+|---|---------|----------------------|-------------------|--------|
+| V1 | Admin role prompt | "Create an external volume" | Prompts for admin_role (default: ACCOUNTADMIN) | |
+| V2 | Cross-skill awareness | Run after PAT sets admin_role | Asks "Use existing USERADMIN or ACCOUNTADMIN?" | |
+| V3 | Manifest immediate write | After admin_role input | `.snow-utils/snow-utils-manifest.md` updated immediately | |
+| V4 | Secured directory | After manifest write | `ls -la .snow-utils/` shows `drwx------` (chmod 700) | |
+| V5 | Secured manifest file | After manifest write | `ls -la .snow-utils/snow-utils-manifest.md` shows `-rw-------` (chmod 600) | |
+| V6 | Prefix explanation | Gather requirements step | Shows prefix examples (bucket, role, volume naming) | |
+| V7 | Dry-run preview | After requirements gathered | Shows BOTH summary AND full SQL/JSON | |
+| V8 | User confirmation | After dry-run | Waits for explicit "yes" before creating | |
+| V9 | --output json (create) | `extvolume create --bucket test --output json` | Clean JSON output, no click.echo noise | |
+
+### Phase 2: Existing Resource Handling
+
+| # | Feature | Test Command / Prompt | Expected Behavior | Status |
+|---|---------|----------------------|-------------------|--------|
+| V10 | Pre-check existing volume | Run skill again after creation | Shows use/delete/recreate options | |
+| V11 | --yes flag (delete) | `extvolume delete --bucket test --yes` | Skips confirmation prompt | |
+| V12 | --output json (delete) | `extvolume delete --bucket test --yes --output json` | Returns `{"status": "success", "deleted": [...]}` | |
+
+### Phase 3: Manifest Flows
+
+| # | Feature | Test Command / Prompt | Expected Behavior | Status |
+|---|---------|----------------------|-------------------|--------|
+| V13 | Cleanup section | Check manifest after creation | Shows cleanup SQL with `USE ROLE <admin_role>` | |
+| V14 | Remove flow | "Remove the external volume" | Reads manifest, uses admin_role for DROP | |
+| V15 | Verify command | After create | `extvolume verify --volume-name X` succeeds | |
+
+### Phase 4: Privilege Escalation Hints
+
+| # | Feature | Test Command / Prompt | Expected Behavior | Status |
+|---|---------|----------------------|-------------------|--------|
+| V16 | App needs elevated access | "My app needs to create Iceberg tables" | Suggests GRANT CREATE ICEBERG TABLE to SA_ROLE | |
+| V17 | No admin in app .env | Check skill guidance | Never suggests putting admin_role in app .env | |
+
+---
+
 ## Test Execution Log
 
 ### Date: ____
@@ -125,6 +166,12 @@ set -a && source .env && set +a && uv run --project snow-utils-pat python snow-u
 
 ```bash
 set -a && source .env && set +a && uv run --project snow-utils-networks python snow-utils-networks/scripts/network.py rule delete --name $NW_RULE_NAME --db $NW_RULE_DB
+```
+
+### Full Volumes Cleanup
+
+```bash
+set -a && source .env && set +a && uv run --project snow-utils-volumes python snow-utils-volumes/scripts/extvolume.py delete --bucket $BUCKET --delete-bucket --force --yes
 ```
 
 ### Reset Test Environment
