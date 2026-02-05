@@ -531,23 +531,16 @@ Created: <TIMESTAMP>
 
 ### Cleanup
 
-```sql
--- 1. Drop external volume (Snowflake)
--- Uses admin_role from .snow-utils/snow-utils-manifest.md
-USE ROLE <admin_role>;  -- e.g., ACCOUNTADMIN
-DROP EXTERNAL VOLUME IF EXISTS HIRC_DUCKDB_DEMO_ICEBERG_EXTERNAL_VOLUME;
-```
-
 ```bash
-# 2. Delete IAM role (AWS)
-aws iam delete-role-policy --role-name hirc-duckdb-demo-iceberg-snowflake-role --policy-name inline-policy 2>/dev/null || true
-aws iam delete-role --role-name hirc-duckdb-demo-iceberg-snowflake-role
+# Single command cleans up all resources (Snowflake + AWS)
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  --region ${AWS_REGION} \
+  delete --bucket ${BUCKET}
 
-# 3. Delete IAM policy (AWS)
-aws iam delete-policy --policy-arn arn:aws:iam::<ACCOUNT>:policy/hirc-duckdb-demo-iceberg-snowflake-policy
-
-# 4. Delete S3 bucket (AWS - must be empty)
-aws s3 rb s3://hirc-duckdb-demo-iceberg --force
+# With S3 bucket deletion (add --force if bucket not empty)
+set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+  --region ${AWS_REGION} \
+  delete --bucket ${BUCKET} --delete-bucket --force
 ```
 
 ```
