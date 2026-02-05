@@ -283,35 +283,60 @@ grep "^SNOWFLAKE_USER=" .env | cut -d= -f2 | tr '[:upper:]' '[:lower:]'
 basename "$(pwd)" | tr '[:upper:]' '[:lower:]' | tr '_' '-'
 ```
 
-**Show prefix and ask user with defaults:**
+**Step 4a: Ask about prefix FIRST:**
 
 ```
 External Volume Configuration:
 
-Prefix (from SNOWFLAKE_USER): <prefix_value>
-Suggested bucket (from project): <project_name>
+Detected prefix (from SNOWFLAKE_USER): <prefix_value>
 
 > **Note:** By default, all AWS resources (S3 bucket, IAM role, IAM policy) are prefixed 
 > with your Snowflake username to avoid naming conflicts in shared AWS accounts.
-> 
-> Example with prefix "ksampath" and bucket "my-demo":
->   - S3 Bucket: ksampath-my-demo
->   - IAM Role: ksampath-my-demo-snowflake-role
->   - External Volume: KSAMPATH_MY_DEMO_EXTERNAL_VOLUME
->
 > You can disable prefixing if you prefer raw names.
 
-1. Bucket name (base name) [default: <project_name>]: 
-2. AWS region [default: us-west-2]:
-3. Use username prefix? [Y/n]:
+1. Use username prefix? [Y/n]:
    - If yes, prefix will be: <prefix_value>
    - If no, resources will use raw bucket name
+```
+
+**⚠️ STOP**: Wait for user input.
+
+**Step 4b: Ask for bucket name (show preview with prefix if selected):**
+
+```
+Suggested bucket (from project): <project_name>
+
+2. Bucket name (base name) [default: <project_name>]: 
+```
+
+**After user enters bucket name, show preview:**
+
+If prefix selected:
+```
+Preview:
+  S3 Bucket:        <prefix>-<bucket>
+  IAM Role:         <prefix>-<bucket>-snowflake-role
+  External Volume:  <PREFIX>_<BUCKET>_EXTERNAL_VOLUME
+```
+
+If no prefix:
+```
+Preview:
+  S3 Bucket:        <bucket>
+  IAM Role:         <bucket>-snowflake-role
+  External Volume:  <BUCKET>_EXTERNAL_VOLUME
+```
+
+**Step 4c: Ask remaining options:**
+
+```
+3. AWS region [default: us-west-2]:
 4. Allow writes? [default: yes]:
 ```
 
 **⚠️ STOP**: Wait for user input.
 
-**After user provides input, update .env:**
+**After user provides all input, update .env:**
 
 - `BUCKET=<user_bucket_name>`
 - `AWS_REGION=<user_region>`
