@@ -94,14 +94,15 @@ cat > .snow-utils/snow-utils-manifest.md << 'EOF'
 This manifest tracks Snowflake resources created by snow-utils skills.
 
 ---
-EOF
-fi
-# Append prereqs section
-cat >> .snow-utils/snow-utils-manifest.md << 'EOF'
 
 ## prereqs
 tools_verified: <TODAY_DATE>
+skills:
 EOF
+fi
+# Add this skill's source URL if not already present
+grep -q "pat:" .snow-utils/snow-utils-manifest.md || \
+  echo "  pat: https://github.com/kameshsampath/snow-utils-skills/snow-utils-pat" >> .snow-utils/snow-utils-manifest.md
 chmod 600 .snow-utils/snow-utils-manifest.md
 ```
 
