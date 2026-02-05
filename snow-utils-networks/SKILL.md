@@ -31,24 +31,20 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 **⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
 
-### Step 0: Check Prerequisites (with Memory Caching)
+### Step 0: Check Prerequisites (Manifest-Cached)
 
-**First, check memory for cached prereqs:**
+**First, check manifest for cached prereqs:**
 
-```
-Check memory at /memories/snow-utils-prereqs.md for:
-- tools_checked: true → skip tool check
-- infra_ready: true → skip infra check in Step 2
-- sa_role, snow_utils_db → use cached values
+```bash
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -A2 "## prereqs"
 ```
 
-**If `tools_checked: true` in memory:** Skip to Step 1.
+**If `tools_verified:` exists with a date:** Skip tool checks, continue to Step 1.
 
 **Otherwise, check required tools:**
 
 ```bash
-command -v uv >/dev/null 2>&1 && echo "uv: OK" || echo "uv: MISSING"
-command -v snow >/dev/null 2>&1 && echo "snow: OK" || echo "snow: MISSING"
+for t in uv snow; do command -v $t &>/dev/null && echo "$t: OK" || echo "$t: MISSING"; done
 ```
 
 **If any tool is MISSING, stop and provide installation instructions:**
@@ -60,11 +56,27 @@ command -v snow >/dev/null 2>&1 && echo "snow: OK" || echo "snow: MISSING"
 
 **⚠️ STOP**: Do not proceed until all prerequisites are installed.
 
-**After tools verified, update memory:**
+**After tools verified, write to manifest:**
 
-```
-Create/update /memories/snow-utils-prereqs.md:
-tools_checked: true
+```bash
+mkdir -p .snow-utils && chmod 700 .snow-utils
+# Create manifest with header if it doesn't exist
+if [ ! -f .snow-utils/snow-utils-manifest.md ]; then
+cat > .snow-utils/snow-utils-manifest.md << 'EOF'
+# Snow-Utils Manifest
+
+This manifest tracks Snowflake resources created by snow-utils skills.
+
+---
+EOF
+fi
+# Append prereqs section
+cat >> .snow-utils/snow-utils-manifest.md << 'EOF'
+
+## prereqs
+tools_verified: <TODAY_DATE>
+EOF
+chmod 600 .snow-utils/snow-utils-manifest.md
 ```
 
 ### Step 1: Load and Merge Environment
