@@ -9,3 +9,6 @@ __pycache__/
 # Environment files
 .env
 !.env.example
+
+# Local docs
+*.local.md
