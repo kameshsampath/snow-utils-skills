@@ -29,7 +29,7 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
-**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
+**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Python scripts (network.py) auto-load `.env` via `load_dotenv()`. For `snow sql` or other shell commands, use `set -a && source .env && set +a` before running.
 
 ### Step 0: Check Prerequisites (Manifest-Cached)
 
@@ -146,7 +146,7 @@ grep -E "^SNOW_UTILS_DB=" .env
 **If SNOW_UTILS_DB is empty**, run check_setup.py first:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --suggest
+uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --suggest
 ```
 
 If not ready, prompt user and run with `--run-setup`.
@@ -493,7 +493,7 @@ Which IP sources should be allowed access?
 Then execute with converted flags:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
   rule update --name <NW_RULE_NAME> --db <NW_RULE_DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>]
 ```
@@ -503,7 +503,7 @@ Then skip to Step 6 (Verify).
 **If user chooses "Remove and recreate":**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
   rule delete --name <NW_RULE_NAME> --db <NW_RULE_DB> --yes
 ```
 
@@ -514,7 +514,7 @@ Then continue to Step 4.
 **Execute:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
   rule create --name <NW_RULE_NAME> --db <NW_RULE_DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
   [--policy <POLICY_NAME>] --dry-run
@@ -572,7 +572,7 @@ This enables:
 **Execute (use --output json to skip CLI confirmation - CoCo handles it):**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
   rule create --name <NW_RULE_NAME> --db <NW_RULE_DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
   [--policy <POLICY_NAME>] --output json
@@ -588,7 +588,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 ### Step 6: Verify
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
   rule list --db <NW_RULE_DB>
 ```
 
@@ -686,7 +686,7 @@ CoCo can use this manifest to replay creation or cleanup resources.
 #### CLI Cleanup (REQUIRED)
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py rule delete --name {NW_RULE_NAME} --db {NW_RULE_DB} --yes
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py rule delete --name {NW_RULE_NAME} --db {NW_RULE_DB} --yes
 ```
 
 #### SQL Reference (FALLBACK ONLY - if CLI unavailable)
@@ -936,7 +936,7 @@ Fix the PAT issue, then run "replay all" again to continue.
 **Usage:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
+uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 ```
 
 **⚠️ DO NOT ADD ANY FLAGS.**

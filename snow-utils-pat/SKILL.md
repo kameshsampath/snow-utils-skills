@@ -55,7 +55,7 @@ When about to write/edit a sensitive value like `SA_PAT`:
 - **SA_ROLE** (`{PROJECT}_ACCESS`): Consumer-only role for PAT restriction. Apps/demos grant it access to their resources.
 - **SA_USER** (`{PROJECT}_RUNNER`): Service user with PAT, restricted to SA_ROLE
 
-**ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
+**ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Python scripts (pat.py, network.py, extvolume.py) auto-load `.env` via `load_dotenv()`. For `snow sql` or other shell commands, use `set -a && source .env && set +a` before running.
 
 ### Step 0: Check Prerequisites (Manifest-Cached)
 
@@ -174,7 +174,7 @@ grep -E "^SNOW_UTILS_DB=" .env
 **If empty**, run check_setup.py with --suggest flag:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --suggest
+uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --suggest
 ```
 
 Parse the JSON response:
@@ -190,7 +190,7 @@ Parse the JSON response:
 **If user confirms setup**, run:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --database <DB> --run-setup
+uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --database <DB> --run-setup
 ```
 
 **After setup completes, update .env:**
@@ -449,7 +449,7 @@ set -a && source .env && set +a && snow sql --role <ADMIN_ROLE> -q "SHOW USER PA
 **If user chooses "Rotate existing":**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   rotate --user <SA_USER> --role <SA_ROLE>
 ```
 
@@ -458,7 +458,7 @@ Then skip to Step 6 (Verify Connection).
 **If user chooses "Remove and recreate":**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   remove --user <SA_USER> --db <SNOW_UTILS_DB> --yes
 ```
 
@@ -471,7 +471,7 @@ Then continue to Step 4.
 **Execute:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --dry-run
 ```
 
@@ -569,7 +569,7 @@ This enables:
 **Execute:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
+uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
   rule create --name <SA_USER>_NETWORK_RULE --db <SNOW_UTILS_DB> --schema NETWORKS \
   --policy <SA_USER>_NETWORK_POLICY --output json
 ```
@@ -592,7 +592,7 @@ Proceed to Step 5b.
 **Execute:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --skip-network --output json
 ```
 
@@ -607,7 +607,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 **Assign network policy to user** (now that user exists):
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
+uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
   policy assign --name <SA_USER>_NETWORK_POLICY --user <SA_USER>
 ```
 
@@ -680,7 +680,7 @@ This manifest records all Snowflake resources created by snow-utils skills.
 Run this command to remove all resources:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   remove --user {SA_USER} --db {SNOW_UTILS_DB}
 ```
 <!-- END -- snow-utils-pat -->
@@ -691,7 +691,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 **Always verify the PAT works after creation:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   verify --user <SA_USER> --role <SA_ROLE>
 ```
 
@@ -797,7 +797,7 @@ This enables recovery if CoCo loses context mid-creation.
 #### CLI Cleanup (REQUIRED)
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user {SA_USER} --db {SNOW_UTILS_DB} --drop-user
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user {SA_USER} --db {SNOW_UTILS_DB} --drop-user
 ```
 
 #### SQL Reference (FALLBACK ONLY - if CLI unavailable)
@@ -857,7 +857,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
    #### CLI Cleanup (REQUIRED)
    
    ```bash
-   set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user KAMESHS_PAT_DEMO_RUNNER --db KAMESHS_SNOW_UTILS --drop-user
+   uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user KAMESHS_PAT_DEMO_RUNNER --db KAMESHS_SNOW_UTILS --drop-user
    ```
 
    ```
@@ -955,7 +955,7 @@ Proceed with creation? [yes/no]
 1. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   --comment "{COMMENT_PREFIX}" create --user {SA_USER} --role {SA_ROLE} --db {SNOW_UTILS_DB}
 ```
 
@@ -1137,7 +1137,7 @@ sed -i '' "s/^SA_PAT=.*/SA_PAT='<TOKEN>'/" .env
 **Usage:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
+uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 ```
 
 **DO NOT ADD ANY FLAGS.**
@@ -1204,14 +1204,14 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python
 #### create
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --output json
 ```
 
 **With custom expiry settings:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
   --default-expiry-days 7 --max-expiry-days 30 --output json
 ```
@@ -1236,7 +1236,7 @@ Removes all PAT-related resources in correct dependency order:
 PAT → Auth Policy (unset) → User → Auth Policy (drop) → Network Policy → Network Rule
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   remove --user <SA_USER> --db <SNOW_UTILS_DB>
 ```
 
@@ -1254,7 +1254,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 Regenerates PAT token while keeping all existing policies intact.
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   rotate --user <SA_USER> --role <SA_ROLE>
 ```
 
@@ -1273,7 +1273,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 Tests PAT authentication using `snow sql -x` (external/passwordless auth).
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
   verify --user <SA_USER> --role <SA_ROLE>
 ```
 

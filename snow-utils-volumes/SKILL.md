@@ -43,7 +43,7 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud stor
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
-**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Always `source .env` before running any script commands.
+**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Python scripts (extvolume.py) auto-load `.env` via `load_dotenv()`. For `snow sql` or other shell commands, use `set -a && source .env && set +a` before running.
 
 ### Step 0: Check Prerequisites (Manifest-Cached)
 
@@ -369,7 +369,7 @@ Resources will be:
 **Execute (with prefix):**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} \
   create --bucket ${BUCKET} --dry-run
 ```
@@ -377,7 +377,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 **Execute (without prefix):**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} --no-prefix \
   create --bucket ${BUCKET} --dry-run
 ```
@@ -466,7 +466,7 @@ CREATE EXTERNAL VOLUME IF NOT EXISTS VOLUME_NAME
 **Execute (with prefix):**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} \
   create --bucket ${BUCKET} --output json
 ```
@@ -474,7 +474,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 **Execute (without prefix):**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} --no-prefix \
   create --bucket ${BUCKET} --output json
 ```
@@ -509,7 +509,7 @@ sleep 15
 **Execute:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   verify --volume-name ${EXTERNAL_VOLUME_NAME}
 ```
 
@@ -570,7 +570,7 @@ This manifest records all Snowflake resources created by snow-utils skills.
 Run this command to remove all resources:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} \
   delete --bucket ${BUCKET} --yes --output json
 ```
@@ -578,7 +578,7 @@ set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DI
 With S3 bucket deletion:
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region ${AWS_REGION} \
   delete --bucket ${BUCKET} --delete-bucket --force --yes --output json
 ```
@@ -643,7 +643,7 @@ CREATE OR REPLACE ICEBERG TABLE my_table (
 **Usage:**
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
+uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 ```
 
 **⚠️ DO NOT ADD ANY FLAGS.**
@@ -761,7 +761,7 @@ Proceed with creation? [yes/no]
 1. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
 
 ```bash
-set -a && source .env && set +a && uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   --region {AWS_REGION} \
   create --bucket {BUCKET} --output json
 ```

@@ -22,7 +22,10 @@ Provides:
 - IPv4 preset support (GitHub Actions, Google, local IP)
 """
 
+import re
+
 import click
+from dotenv import load_dotenv
 from snow_utils_common import (
     NetworkRuleMode,
     NetworkRuleType,
@@ -33,6 +36,27 @@ from snow_utils_common import (
     set_snow_cli_options,
     validate_mode_type,
 )
+
+
+def normalize_identifier(name: str, style: str = "snowflake") -> str:
+    """Normalize name for SQL or DNS compliance.
+
+    Args:
+        name: Raw input (e.g., "My Cool Project!")
+        style: "snowflake" (UPPER_SNAKE) or "aws" (lower-kebab)
+
+    Returns:
+        Normalized identifier safe for SQL or AWS DNS
+    """
+    clean = re.sub(r"[^a-zA-Z0-9\s\-_]", "", name)
+    clean = re.sub(r"\s+", "_" if style == "snowflake" else "-", clean)
+    clean = re.sub(r"[-_]+", "_" if style == "snowflake" else "-", clean)
+    clean = clean.strip("-_")
+
+    if style == "snowflake":
+        return clean.upper()
+    else:
+        return clean.lower()
 
 
 def get_network_rule_sql(
@@ -419,8 +443,8 @@ def get_setup_network_for_user_sql(
     rule_name = f"{user}_NETWORK_RULE".upper()
     policy_name = f"{user}_NETWORK_POLICY".upper()
     rule_fqn = f"{db.upper()}.{schema.upper()}.{rule_name}"
-    user_part = (comment_prefix or user).upper()
-    project_part = db.upper().replace("-", "_")
+    user_part = normalize_identifier(comment_prefix or user, "snowflake")
+    project_part = normalize_identifier(db, "snowflake")
 
     rule_sql = get_network_rule_sql(
         name=rule_name,
@@ -548,6 +572,11 @@ def unassign_network_policy_from_user(user: str, admin_role: str = "accountadmin
 
 MODE_CHOICES = ["ingress", "internal_stage", "egress", "postgres_ingress", "postgres_egress"]
 TYPE_CHOICES = ["ipv4", "host_port", "private_host_port", "awsvpceid"]
+
+
+# Auto-load .env from current working directory so callers
+# don't need ``set -a && source .env && set +a`` before invoking.
+load_dotenv()
 
 
 @click.group()
@@ -825,7 +854,6 @@ def rule_delete_cmd(name: str, db: str, schema: str) -> None:
 @click.option(
     "--admin-role",
     "-a",
-    envvar="NW_ADMIN_ROLE",
     default="accountadmin",
     help="Admin role for listing resources",
 )
@@ -930,7 +958,6 @@ def policy_alter_cmd(name: str, rules: str, dry_run: bool, output: str) -> None:
 @click.option(
     "--admin-role",
     "-a",
-    envvar="NW_ADMIN_ROLE",
     default="accountadmin",
     help="Admin role for modifying resources",
 )
@@ -950,7 +977,6 @@ def policy_delete_cmd(name: str, user: str | None, admin_role: str) -> None:
 @click.option(
     "--admin-role",
     "-a",
-    envvar="SA_ADMIN_ROLE",
     default="accountadmin",
     help="Admin role for listing resources",
 )
@@ -974,7 +1000,6 @@ def policy_list_cmd(admin_role: str) -> None:
 @click.option(
     "--admin-role",
     "-a",
-    envvar="NW_ADMIN_ROLE",
     default="accountadmin",
     help="Admin role for assignment",
 )
