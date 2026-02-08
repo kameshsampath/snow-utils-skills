@@ -1,6 +1,6 @@
 ---
 name: snow-utils-pat
-description: "Create Snowflake Programmatic Access Tokens (PATs) for service accounts. Use when: setting up service user, creating PAT, configuring authentication policy, network policy for PAT. Triggers: programmatic access token, PAT, service account, snowflake authentication, replay pat, replay pat manifest, recreate pat, replay all manifests, replay all snow-utils."
+description: "Create Snowflake Programmatic Access Tokens (PATs) for service accounts. Use when: setting up service user, creating PAT, configuring authentication policy, network policy for PAT. Triggers: programmatic access token, PAT, service account, snowflake authentication, replay pat, replay pat manifest, recreate pat, replay all manifests, replay all snow-utils, export manifest for sharing, setup from shared manifest, replay from shared manifest."
 ---
 
 # Snowflake PAT Setup
@@ -832,6 +832,26 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 <!-- END -- snow-utils-pat -->
 ```
 
+#### Export for Sharing Flow
+
+**Trigger phrases:** "export manifest for sharing"
+
+**Purpose:** Create a portable copy of the manifest for another developer. See BEST_PRACTICES "Export for Sharing Flow" for the full specification.
+
+**Summary:**
+
+1. Verify ALL skill sections have `Status: COMPLETE`
+2. Read `project_name` from `## project_recipe`
+3. Ask user for export location (default: project root)
+4. Create `{project_name}-manifest.md` with:
+   - `<!-- COCO_INSTRUCTION -->` at top
+   - `## shared_info` with origin metadata
+   - ALL statuses set to `REMOVED`
+   - `# ADAPT: user-prefixed` markers on user-prefixed values
+   - Cleanup instructions stripped
+
+**Setup from shared manifest:** See hirc-duckdb-demo SKILL.md for the full "setup from shared manifest" flow (project directory creation, manifest placement, then replay with name adaptation).
+
 #### Remove Flow (Manifest-Driven Cleanup)
 
 > **🚨 CRITICAL: Cleanup MUST be driven by the manifest.**
@@ -967,7 +987,22 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
       SNOW_UTILS_DB=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*Database:\*\*" | head -1 | sed 's/\*\*Database:\*\* //')
       ```
 
-   e. Write inferred values to `.env` (only if not already set):
+   e. **Validate extracted values** (grep validation):
+
+      ```bash
+      for var in SA_USER SA_ROLE SNOW_UTILS_DB; do
+        val=$(eval echo \$$var)
+        [ -z "$val" ] && echo "WARNING: Could not extract ${var} from manifest"
+      done
+      ```
+
+      If any value is empty, ask user to enter manually or abort.
+
+   f. **Detect shared manifest and offer name adaptation:**
+
+      If manifest contains `# ADAPT: user-prefixed` markers, extract `shared_by` from `## shared_info` and Bob's `SNOWFLAKE_USER`. If prefixes differ, show the **combined summary + adaptation screen** (see BEST_PRACTICES "Name Adaptation During Replay"). If not shared, skip adaptation.
+
+   g. Write values (adapted or original) to `.env` (only if not already set):
 
       ```bash
       for var in SA_USER SA_ROLE SNOW_UTILS_DB; do
@@ -978,7 +1013,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
       done
       ```
 
-   f. Leave `SA_PAT` empty — it will be created fresh during this replay.
+   h. Leave `SA_PAT` empty — it will be created fresh during this replay.
 
    **If .env exists and has all values:** Skip to step 4.
 

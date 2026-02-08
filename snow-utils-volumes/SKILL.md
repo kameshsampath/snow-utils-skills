@@ -1,6 +1,6 @@
 ---
 name: snow-utils-volumes
-description: "Create Snowflake external volumes with S3 storage. Use when: setting up external storage, creating external volume, configuring S3 for Snowflake, Iceberg tables, unloading data. Triggers: external volume, s3 snowflake, iceberg storage, data lake storage, replay volumes, replay volume manifest, recreate external volume, replay all manifests, replay all snow-utils."
+description: "Create Snowflake external volumes with S3 storage. Use when: setting up external storage, creating external volume, configuring S3 for Snowflake, Iceberg tables, unloading data. Triggers: external volume, s3 snowflake, iceberg storage, data lake storage, replay volumes, replay volume manifest, recreate external volume, replay all manifests, replay all snow-utils, export manifest for sharing, setup from shared manifest, replay from shared manifest."
 ---
 
 # External Volume Setup (AWS S3)
@@ -706,6 +706,26 @@ extvolume.py --no-prefix create --bucket my-bucket
 - Snowflake external volume
 - Updated .env with all values
 
+## Export for Sharing Flow
+
+**Trigger phrases:** "export manifest for sharing"
+
+**Purpose:** Create a portable copy of the manifest for another developer. See BEST_PRACTICES "Export for Sharing Flow" for the full specification.
+
+**Summary:**
+
+1. Verify ALL skill sections have `Status: COMPLETE`
+2. Read `project_name` from `## project_recipe`
+3. Ask user for export location (default: project root)
+4. Create `{project_name}-manifest.md` with:
+   - `<!-- COCO_INSTRUCTION -->` at top
+   - `## shared_info` with origin metadata
+   - ALL statuses set to `REMOVED`
+   - `# ADAPT: user-prefixed` markers on user-prefixed values
+   - Cleanup instructions stripped
+
+**Setup from shared manifest:** See hirc-duckdb-demo SKILL.md for the full "setup from shared manifest" flow.
+
 ## Replay Flow (Minimal Approvals)
 
 > **🚨 GOAL:** Replay is for less technical users who trust the setup. Minimize friction.
@@ -771,7 +791,22 @@ extvolume.py --no-prefix create --bucket my-bucket
       EXTERNAL_VOLUME_NAME=$(grep -A50 "<!-- START -- snow-utils-volumes" .snow-utils/snow-utils-manifest.md | grep "External Volume" | grep -o '[A-Z_]*EXTERNAL_VOLUME' | head -1)
       ```
 
-   e. Write inferred values to `.env` (only if not already set):
+   e. **Validate extracted values** (grep validation):
+
+      ```bash
+      for var in BUCKET AWS_REGION EXTERNAL_VOLUME_NAME; do
+        val=$(eval echo \$$var)
+        [ -z "$val" ] && echo "WARNING: Could not extract ${var} from manifest"
+      done
+      ```
+
+      If any value is empty, ask user to enter manually or abort.
+
+   f. **Detect shared manifest and offer name adaptation:**
+
+      If manifest contains `# ADAPT: user-prefixed` markers, detect prefix mismatch and show the **combined summary + adaptation screen** (see BEST_PRACTICES "Name Adaptation During Replay"). `EXTERNAL_VOLUME_NAME` and `EXTVOLUME_PREFIX` may need adaptation if user-prefixed.
+
+   g. Write values (adapted or original) to `.env` (only if not already set):
 
       ```bash
       for var in BUCKET AWS_REGION EXTVOLUME_PREFIX EXTERNAL_VOLUME_NAME; do

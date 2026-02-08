@@ -1,6 +1,6 @@
 ---
 name: snow-utils-networks
-description: "Create Snowflake network rules and policies for IP allowlisting. Use when: setting up network security, creating ingress/egress rules, allowlisting GitHub Actions, Google IPs, or custom CIDRs. Triggers: network rule, network policy, IP allowlist, CIDR, ingress, egress, GitHub Actions IPs, firewall, replay network, replay network manifest, recreate network, replay all manifests, replay all snow-utils."
+description: "Create Snowflake network rules and policies for IP allowlisting. Use when: setting up network security, creating ingress/egress rules, allowlisting GitHub Actions, Google IPs, or custom CIDRs. Triggers: network rule, network policy, IP allowlist, CIDR, ingress, egress, GitHub Actions IPs, firewall, replay network, replay network manifest, recreate network, replay all manifests, replay all snow-utils, export manifest for sharing, setup from shared manifest, replay from shared manifest."
 ---
 
 # Snowflake Network Rules & Policies
@@ -711,6 +711,26 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 <!-- END -- snow-utils-networks:{NW_RULE_NAME} -->
 ```
 
+#### Export for Sharing Flow
+
+**Trigger phrases:** "export manifest for sharing"
+
+**Purpose:** Create a portable copy of the manifest for another developer. See BEST_PRACTICES "Export for Sharing Flow" for the full specification.
+
+**Summary:**
+
+1. Verify ALL skill sections have `Status: COMPLETE`
+2. Read `project_name` from `## project_recipe`
+3. Ask user for export location (default: project root)
+4. Create `{project_name}-manifest.md` with:
+   - `<!-- COCO_INSTRUCTION -->` at top
+   - `## shared_info` with origin metadata
+   - ALL statuses set to `REMOVED`
+   - `# ADAPT: user-prefixed` markers on user-prefixed values
+   - Cleanup instructions stripped
+
+**Setup from shared manifest:** See hirc-duckdb-demo SKILL.md for the full "setup from shared manifest" flow.
+
 #### Remove Flow (Manifest-Driven Cleanup)
 
 > **🚨 CRITICAL: Cleanup MUST be driven by the manifest.**
@@ -828,7 +848,22 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
       SNOW_UTILS_DB=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*Database:\*\*" | head -1 | sed 's/\*\*Database:\*\* //')
       ```
 
-   f. Write inferred values to `.env` (only if not already set):
+   f. **Validate extracted values** (grep validation):
+
+      ```bash
+      for var in NW_RULE_NAME NW_RULE_DB; do
+        val=$(eval echo \$$var)
+        [ -z "$val" ] && echo "WARNING: Could not extract ${var} from manifest"
+      done
+      ```
+
+      If any value is empty, ask user to enter manually or abort.
+
+   g. **Detect shared manifest and offer name adaptation:**
+
+      If manifest contains `# ADAPT: user-prefixed` markers, detect prefix mismatch and show the **combined summary + adaptation screen** (see BEST_PRACTICES "Name Adaptation During Replay"). Network rule names typically derive from SA_USER, so adaptation applies to `NW_RULE_NAME` if user-prefixed.
+
+   h. Write values (adapted or original) to `.env` (only if not already set):
 
       ```bash
       for var in NW_RULE_NAME NW_RULE_DB SNOW_UTILS_DB; do

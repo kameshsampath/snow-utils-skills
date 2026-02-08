@@ -141,6 +141,126 @@ Each resource gets a unique section with markers:
 - Dry-run preview before execution
 - Clear prompts with sensible defaults
 
+## Shared Manifests
+
+The manifest can be **exported and shared** with another developer so they can replay the entire setup on their machine — no manual configuration needed.
+
+### How It Works: Alice Shares With Bob
+
+```mermaid
+sequenceDiagram
+    participant Alice
+    participant CoCo as CoCo (Alice)
+    participant Email
+    participant Bob
+    participant CoCo2 as CoCo (Bob)
+    participant SF as Snowflake
+
+    Note over Alice,CoCo: Alice has a working setup (all COMPLETE)
+
+    Alice->>CoCo: "export manifest for sharing"
+    CoCo->>CoCo: Verify all sections COMPLETE
+    CoCo->>CoCo: Copy manifest → hirc-duckdb-demo-manifest.md
+    CoCo->>CoCo: Set statuses to REMOVED
+    CoCo->>CoCo: Add # ADAPT markers on user-prefixed values
+    CoCo->>CoCo: Inject COCO_INSTRUCTION + shared_info
+    CoCo-->>Alice: Export saved to project root
+
+    Alice->>Email: Send hirc-duckdb-demo-manifest.md
+
+    Email-->>Bob: Receives manifest file
+
+    Bob->>CoCo2: Opens file, asks "setup from shared manifest"
+    CoCo2->>Bob: "Create project dir ./hirc-duckdb-demo?"
+    Bob-->>CoCo2: Yes
+
+    CoCo2->>CoCo2: Create dir, move manifest to .snow-utils/
+    CoCo2->>Bob: "Which Snowflake connection?"
+    Bob-->>CoCo2: Selects connection
+
+    CoCo2->>SF: snow connection test
+    SF-->>CoCo2: Account, user (BOBS), URL
+
+    CoCo2->>Bob: Combined summary + adaptation screen
+    Note over CoCo2,Bob: Original (ALICE) → Your Value (BOBS)
+    Bob-->>CoCo2: Confirm all
+
+    CoCo2->>SF: Create resources with adapted names
+    SF-->>CoCo2: All resources created
+
+    CoCo2-->>Bob: Setup complete!
+```
+
+### Key Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Export precondition** | All skill sections must be `COMPLETE` before export |
+| **Project-named file** | Export creates `{project_name}-manifest.md` in project root (not in `.snow-utils/`) |
+| **ADAPT markers** | User-prefixed values get `# ADAPT: user-prefixed` so CoCo offers name adaptation |
+| **3-prompt replay** | Project directory → Connection name → Combined summary + adaptation → done |
+| **Canonical path rule** | Skills only read from `.snow-utils/snow-utils-manifest.md` — exported file is invisible to skill flows |
+
+### Example: Exported Manifest (What Bob Receives)
+
+```markdown
+<!-- COCO_INSTRUCTION: This is a shared snow-utils manifest.
+     project_name: hirc-duckdb-demo
+     To set up: open this file in Cursor and ask "setup from shared manifest".
+     CoCo will create the project directory, move this file into place, and replay. -->
+
+# Snow-Utils Manifest
+
+## shared_info
+shared_by: ALICE
+shared_date: 2026-02-07
+original_project_dir: hirc-duckdb-demo
+notes: |
+  To replay: open in Cursor, ask "setup from shared manifest"
+
+## project_recipe
+project_name: hirc-duckdb-demo
+
+<!-- START: snow-utils-pat -->
+## snow-utils-pat
+**Status:** REMOVED
+**User:** ALICE_HIRC_DUCKDB_DEMO_RUNNER  # ADAPT: user-prefixed
+**Role:** ALICE_HIRC_DUCKDB_DEMO_ACCESS  # ADAPT: user-prefixed
+**Database:** ALICE_SNOW_UTILS  # ADAPT: user-prefixed
+...
+<!-- END: snow-utils-pat -->
+```
+
+### Name Adaptation (Combined Summary Screen)
+
+When Bob replays, CoCo detects the prefix mismatch and shows one unified screen:
+
+```
+Replaying shared manifest for: hirc-duckdb-demo
+Shared by: ALICE | Your user: BOBS
+
+  Resource                    Original (ALICE)                     → Your Value (BOBS)
+  ─────────────────────────────────────────────────────────────────────────────────────
+  Service User                ALICE_HIRC_DUCKDB_DEMO_RUNNER        → BOBS_HIRC_DUCKDB_DEMO_RUNNER
+  Service Role                ALICE_HIRC_DUCKDB_DEMO_ACCESS        → BOBS_HIRC_DUCKDB_DEMO_ACCESS
+  Utils Database              ALICE_SNOW_UTILS                     → BOBS_SNOW_UTILS
+  ─────────────────────────────────────────────────────────────────────────────────────
+  S3 Bucket                   my-iceberg-bucket                     (unchanged)
+  Region                      us-west-2                             (unchanged)
+
+Options:
+1. Confirm all (with adaptations) → proceed
+2. Edit a specific value
+3. Keep original names → proceed
+```
+
+### Trigger Phrases
+
+| Action | Phrases |
+|--------|---------|
+| Export | "export manifest for sharing" |
+| Import/Setup | "setup from shared manifest", "replay from shared manifest", "import shared manifest" |
+
 ## Project Structure
 
 ```
