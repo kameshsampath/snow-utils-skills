@@ -84,6 +84,9 @@ This manifest tracks Snowflake resources created by snow-utils skills.
 
 ---
 
+## project_recipe
+project_name: <PROJECT_NAME>
+
 ## prereqs
 tools_verified: <TODAY_DATE>
 skills:
@@ -94,6 +97,8 @@ grep -q "volumes:" .snow-utils/snow-utils-manifest.md || \
   echo "  volumes: https://github.com/kameshsampath/snow-utils-skills/snow-utils-volumes" >> .snow-utils/snow-utils-manifest.md
 chmod 600 .snow-utils/snow-utils-manifest.md
 ```
+
+> **`<PROJECT_NAME>` derivation:** Use the current directory name: `basename $(pwd)`. Example: if in `/home/user/hirc-duckdb-demo`, project_name = `hirc-duckdb-demo`. This enables manifest portability — another developer can recreate the project directory from the manifest.
 
 ### Step 1: Load and Merge Environment
 
@@ -201,22 +206,22 @@ mkdir -p .snow-utils && chmod 700 .snow-utils
 **Check manifest for existing admin_role:**
 
 ```bash
-cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -A1 "## admin_role" | grep "volumes:"
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -A1 "## admin_role" | grep "snow-utils-volumes:"
 ```
 
-**If admin_role exists for volumes:** Use it.
+**If admin_role exists for snow-utils-volumes:** Use it.
 
-**If admin_role NOT set for volumes, check other skills:**
+**If admin_role NOT set for snow-utils-volumes, check other skills:**
 
 ```bash
-cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -E "^(pat|networks):" | head -1
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -E "^snow-utils-(pat|networks):" | head -1
 ```
 
 **If another skill has admin_role, ask user:**
 
 ```
 Found admin_role from another skill:
-  pat: USERADMIN
+  snow-utils-pat: USERADMIN
   
 External volume creation requires ACCOUNTADMIN (CREATE EXTERNAL VOLUME privilege).
 
@@ -248,7 +253,7 @@ chmod 700 .snow-utils
 cat >> .snow-utils/snow-utils-manifest.md << 'EOF'
 
 ## admin_role
-volumes: <USER_ROLE>
+snow-utils-volumes: <USER_ROLE>
 EOF
 
 # Secure the file
@@ -724,21 +729,76 @@ extvolume.py --no-prefix create --bucket my-bucket
    - If section NOT found: "No external volume resources in manifest. Nothing to replay for volumes."
    - If section found: Continue to step 3
 
-3. **Check Status field and act accordingly:**
+3. **Reconstruct .env (if missing or incomplete):**
+
+   > **Portable Manifest:** When replaying from a shared manifest, `.env` may not exist. Reconstruct it using manifest values + one user input.
+
+   ```bash
+   # Check if .env exists and has connection details
+   grep -q "^SNOWFLAKE_DEFAULT_CONNECTION_NAME=." .env 2>/dev/null || echo "NEEDS_SETUP"
+   ```
+
+   **If NEEDS_SETUP:**
+
+   a. Copy `.env.example` from skill directory:
+
+      ```bash
+      cp <SKILL_DIR>/.env.example .env
+      ```
+
+   b. Ask user: "Which Snowflake connection?" then:
+
+      ```bash
+      snow connection list
+      ```
+
+      **⚠️ STOP**: Wait for user to select a connection.
+
+   c. Test connection and extract details:
+
+      ```bash
+      snow connection test -c <selected_connection> --format json
+      ```
+
+      Write to .env: `SNOWFLAKE_DEFAULT_CONNECTION_NAME`, `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_ACCOUNT_URL`
+
+   d. **Infer from manifest `snow-utils-volumes` section:**
+
+      ```bash
+      BUCKET=$(grep -A30 "<!-- START -- snow-utils-volumes" .snow-utils/snow-utils-manifest.md | grep "^\*\*Bucket:\*\*" | head -1 | sed 's/\*\*Bucket:\*\* //')
+      AWS_REGION=$(grep -A30 "<!-- START -- snow-utils-volumes" .snow-utils/snow-utils-manifest.md | grep "^\*\*Region:\*\*" | head -1 | sed 's/\*\*Region:\*\* //')
+      EXTVOLUME_PREFIX=$(grep -A30 "<!-- START -- snow-utils-volumes" .snow-utils/snow-utils-manifest.md | grep "^\*\*Prefix:\*\*" | head -1 | sed 's/\*\*Prefix:\*\* //')
+      EXTERNAL_VOLUME_NAME=$(grep -A50 "<!-- START -- snow-utils-volumes" .snow-utils/snow-utils-manifest.md | grep "External Volume" | grep -o '[A-Z_]*EXTERNAL_VOLUME' | head -1)
+      ```
+
+   e. Write inferred values to `.env` (only if not already set):
+
+      ```bash
+      for var in BUCKET AWS_REGION EXTVOLUME_PREFIX EXTERNAL_VOLUME_NAME; do
+        val=$(eval echo \$$var)
+        [ -n "$val" ] && (grep -q "^${var}=" .env && \
+          sed -i '' "s/^${var}=.*/${var}=${val}/" .env || \
+          echo "${var}=${val}" >> .env)
+      done
+      ```
+
+   **If .env exists and has all values:** Skip to step 4.
+
+4. **Check Status field and act accordingly:**
 
 | Status | Action |
 |--------|--------|
 | `REMOVED` | Proceed with creation (resources don't exist) |
 | `COMPLETE` | Warn: "Resources already exist. Run 'delete' first or choose 'recreate' to cleanup and recreate." |
 
-1. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
+5. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
 
-2. **If Status is `REMOVED`**, extract values and display summary:
+6. **If Status is `REMOVED`**, extract values and display pre-populated summary:
 
 ```
-ℹ️  Replay from manifest will create:
+ℹ️  Replay from manifest — values pre-populated (no questions to re-answer):
 
-  Resources:
+  Resources to create:
     • S3 Bucket:        {PREFIX}-{BUCKET}
     • IAM Policy:       {PREFIX}-{BUCKET}-snowflake-policy
     • IAM Role:         {PREFIX}-{BUCKET}-snowflake-role
@@ -750,15 +810,15 @@ extvolume.py --no-prefix create --bucket my-bucket
     • project:          {BUCKET_UPPER}
     • snowflake-volume: {PREFIX}_{BUCKET}_EXTERNAL_VOLUME
 
-  Configuration:
-    Prefix:   {PREFIX}
-    Bucket:   {BUCKET}
-    Region:   {AWS_REGION}
+  Configuration (from manifest):
+    Prefix:   {PREFIX}       (from manifest **Prefix:** field)
+    Bucket:   {BUCKET}       (from manifest **Bucket:** field)
+    Region:   {AWS_REGION}   (from manifest **Region:** field)
 
 Proceed with creation? [yes/no]
 ```
 
-1. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
+7. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
 
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
@@ -766,7 +826,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
   create --bucket {BUCKET} --output json
 ```
 
-1. **Update manifest Status** from `REMOVED` to `COMPLETE` after successful creation.
+8. **Update manifest Status** from `REMOVED` to `COMPLETE` after successful creation.
 
 ## Replay All Flow (Multi-Skill Sequential)
 

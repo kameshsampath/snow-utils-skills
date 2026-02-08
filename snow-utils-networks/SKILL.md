@@ -69,6 +69,9 @@ This manifest tracks Snowflake resources created by snow-utils skills.
 
 ---
 
+## project_recipe
+project_name: <PROJECT_NAME>
+
 ## prereqs
 tools_verified: <TODAY_DATE>
 skills:
@@ -79,6 +82,8 @@ grep -q "networks:" .snow-utils/snow-utils-manifest.md || \
   echo "  networks: https://github.com/kameshsampath/snow-utils-skills/snow-utils-networks" >> .snow-utils/snow-utils-manifest.md
 chmod 600 .snow-utils/snow-utils-manifest.md
 ```
+
+> **`<PROJECT_NAME>` derivation:** Use the current directory name: `basename $(pwd)`. Example: if in `/home/user/hirc-duckdb-demo`, project_name = `hirc-duckdb-demo`. This enables manifest portability — another developer can recreate the project directory from the manifest.
 
 ### Step 1: Load and Merge Environment
 
@@ -189,15 +194,15 @@ mkdir -p .snow-utils && chmod 700 .snow-utils
 **Check manifest for existing admin_role:**
 
 ```bash
-cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -A1 "## admin_role" | grep "networks:"
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -A1 "## admin_role" | grep "snow-utils-networks:"
 ```
 
-**If admin_role exists for networks:** Use it, continue to Step 2b (privilege verification).
+**If admin_role exists for snow-utils-networks:** Use it, continue to Step 2b (privilege verification).
 
-**If admin_role NOT set for networks, check other skills:**
+**If admin_role NOT set for snow-utils-networks, check other skills:**
 
 ```bash
-cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -E "^(volumes|pat):" | head -1
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -E "^snow-utils-(volumes|pat):" | head -1
 ```
 
 **If another skill has admin_role set**, use `ask_user_question`:
@@ -226,7 +231,7 @@ Admin role for network operations:
 chmod 700 .snow-utils
 cat >> .snow-utils/snow-utils-manifest.md << 'EOF'
 ## admin_role
-networks: <USER_ROLE>
+snow-utils-networks: <USER_ROLE>
 EOF
 chmod 600 .snow-utils/snow-utils-manifest.md
 ```
@@ -777,7 +782,66 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
    - If section NOT found: "No network resources in manifest. Nothing to replay for networks."
    - If section found: Continue to step 3
 
-3. **Check Status:**
+3. **Reconstruct .env (if missing or incomplete):**
+
+   > **Portable Manifest:** When replaying from a shared manifest, `.env` may not exist. Reconstruct it using manifest values + one user input.
+
+   ```bash
+   # Check if .env exists and has connection details
+   grep -q "^SNOWFLAKE_DEFAULT_CONNECTION_NAME=." .env 2>/dev/null || echo "NEEDS_SETUP"
+   ```
+
+   **If NEEDS_SETUP:**
+
+   a. Copy `.env.example` from skill directory:
+
+      ```bash
+      cp <SKILL_DIR>/.env.example .env
+      ```
+
+   b. Ask user: "Which Snowflake connection?" then:
+
+      ```bash
+      snow connection list
+      ```
+
+      **⚠️ STOP**: Wait for user to select a connection.
+
+   c. Test connection and extract details:
+
+      ```bash
+      snow connection test -c <selected_connection> --format json
+      ```
+
+      Write to .env: `SNOWFLAKE_DEFAULT_CONNECTION_NAME`, `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_ACCOUNT_URL`
+
+   d. **Infer from manifest `snow-utils-networks` section:**
+
+      ```bash
+      NW_RULE_NAME=$(grep -A30 "<!-- START -- snow-utils-networks" .snow-utils/snow-utils-manifest.md | grep "^\*\*Rule Name:\*\*" | head -1 | sed 's/\*\*Rule Name:\*\* //')
+      NW_RULE_DB=$(grep -A30 "<!-- START -- snow-utils-networks" .snow-utils/snow-utils-manifest.md | grep "^\*\*Database:\*\*" | head -1 | sed 's/\*\*Database:\*\* //')
+      ```
+
+   e. Also check for SNOW_UTILS_DB from other sections (may be needed):
+
+      ```bash
+      SNOW_UTILS_DB=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*Database:\*\*" | head -1 | sed 's/\*\*Database:\*\* //')
+      ```
+
+   f. Write inferred values to `.env` (only if not already set):
+
+      ```bash
+      for var in NW_RULE_NAME NW_RULE_DB SNOW_UTILS_DB; do
+        val=$(eval echo \$$var)
+        [ -n "$val" ] && (grep -q "^${var}=" .env && \
+          sed -i '' "s/^${var}=.*/${var}=${val}/" .env || \
+          echo "${var}=${val}" >> .env)
+      done
+      ```
+
+   **If .env exists and has all values:** Skip to step 4.
+
+4. **Check Status:**
 
 | Status | Action |
 |--------|--------|
@@ -785,27 +849,32 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 | `COMPLETE` | Warn: "Resources already exist. Run 'remove' first or choose 'recreate'" |
 | `IN_PROGRESS` | Use Resume Flow instead (partial creation) |
 
-1. **Display info summary with single confirmation:**
+5. **Display pre-populated summary with single confirmation:**
 
 ```
 
-ℹ️  Replay from manifest will create:
+ℹ️  Replay from manifest — values pre-populated (no questions to re-answer):
 
-  1. Network Rule:   {NW_RULE_NAME}
-  2. Network Policy: {NW_RULE_NAME}_POLICY
+  Resources to create:
+    1. Network Rule:   {NW_RULE_NAME}
+    2. Network Policy: {NW_RULE_NAME}_POLICY
 
-IP Sources from manifest:
-  Local IP:       {LOCAL_IP}
-  GitHub Actions: {yes/no}
-  Google Cloud:   {yes/no}
-  Custom CIDRs:   {list}
+  Configuration (from manifest):
+    Rule Name:  {NW_RULE_NAME}     (from manifest **Rule Name:** field)
+    Database:   {NW_RULE_DB}       (from manifest **Database:** field)
+
+  IP Sources (from manifest):
+    Local IP:       {LOCAL_IP}     (auto-detected on this machine)
+    GitHub Actions: {yes/no}       (from manifest IP Sources table)
+    Google Cloud:   {yes/no}       (from manifest IP Sources table)
+    Custom CIDRs:   {list}         (from manifest IP Sources table)
 
 Proceed with creation? [yes/no]
 
 ```
 
-1. **On "yes":** Execute all creation steps without individual confirmations
-2. **Update manifest** status back to COMPLETE as each resource is created
+6. **On "yes":** Execute all creation steps without individual confirmations
+7. **Update manifest** status back to COMPLETE as each resource is created
 
 #### Resume Flow (Partial Creation Recovery)
 

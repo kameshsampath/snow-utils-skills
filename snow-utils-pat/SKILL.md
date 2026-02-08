@@ -95,6 +95,9 @@ This manifest tracks Snowflake resources created by snow-utils skills.
 
 ---
 
+## project_recipe
+project_name: <PROJECT_NAME>
+
 ## prereqs
 tools_verified: <TODAY_DATE>
 skills:
@@ -105,6 +108,8 @@ grep -q "pat:" .snow-utils/snow-utils-manifest.md || \
   echo "  pat: https://github.com/kameshsampath/snow-utils-skills/snow-utils-pat" >> .snow-utils/snow-utils-manifest.md
 chmod 600 .snow-utils/snow-utils-manifest.md
 ```
+
+> **`<PROJECT_NAME>` derivation:** Use the current directory name: `basename $(pwd)`. Example: if in `/home/user/hirc-duckdb-demo`, project_name = `hirc-duckdb-demo`. This enables manifest portability — another developer can recreate the project directory from the manifest.
 
 ### Step 1: Load and Merge Environment
 
@@ -234,22 +239,22 @@ mkdir -p .snow-utils && chmod 700 .snow-utils
 **Check manifest for existing admin_role:**
 
 ```bash
-cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -A1 "## admin_role" | grep "pat:"
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -A1 "## admin_role" | grep "snow-utils-pat:"
 ```
 
-**If admin_role exists for pat:** Use it, continue to Step 2b (privilege verification).
+**If admin_role exists for snow-utils-pat:** Use it, continue to Step 2b (privilege verification).
 
-**If admin_role NOT set for pat, check other skills:**
+**If admin_role NOT set for snow-utils-pat, check other skills:**
 
 ```bash
-cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -E "^(volumes|networks):" | head -1
+cat .snow-utils/snow-utils-manifest.md 2>/dev/null | grep -E "^snow-utils-(volumes|networks):" | head -1
 ```
 
 **If another skill has admin_role, ask user:**
 
 ```
 Found admin_role from another skill:
-  volumes: ACCOUNTADMIN
+  snow-utils-volumes: ACCOUNTADMIN
   
 PAT creation requires CREATE USER + CREATE ROLE + MANAGE GRANTS + CREATE AUTHENTICATION POLICY.
 
@@ -283,7 +288,7 @@ chmod 700 .snow-utils
 cat >> .snow-utils/snow-utils-manifest.md << 'EOF'
 
 ## admin_role
-pat: <USER_ROLE>
+snow-utils-pat: <USER_ROLE>
 EOF
 
 chmod 600 .snow-utils/snow-utils-manifest.md
@@ -921,7 +926,63 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
    - If section NOT found: "No PAT resources in manifest. Nothing to replay for PAT."
    - If section found: Continue to step 3
 
-3. **Check Status field and act accordingly:**
+3. **Reconstruct .env (if missing or incomplete):**
+
+   > **Portable Manifest:** When replaying from a shared manifest, `.env` may not exist. Reconstruct it using manifest values + one user input.
+
+   ```bash
+   # Check if .env exists and has connection details
+   grep -q "^SNOWFLAKE_DEFAULT_CONNECTION_NAME=." .env 2>/dev/null || echo "NEEDS_SETUP"
+   ```
+
+   **If NEEDS_SETUP:**
+
+   a. Copy `.env.example` from skill directory:
+
+      ```bash
+      cp <SKILL_DIR>/.env.example .env
+      ```
+
+   b. Ask user: "Which Snowflake connection?" then:
+
+      ```bash
+      snow connection list
+      ```
+
+      **⚠️ STOP**: Wait for user to select a connection.
+
+   c. Test connection and extract details:
+
+      ```bash
+      snow connection test -c <selected_connection> --format json
+      ```
+
+      Write to .env: `SNOWFLAKE_DEFAULT_CONNECTION_NAME`, `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_ACCOUNT_URL`
+
+   d. **Infer from manifest `snow-utils-pat` section:**
+
+      ```bash
+      SA_USER=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*User:\*\*" | head -1 | sed 's/\*\*User:\*\* //')
+      SA_ROLE=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*Role:\*\*" | head -1 | sed 's/\*\*Role:\*\* //')
+      SNOW_UTILS_DB=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*Database:\*\*" | head -1 | sed 's/\*\*Database:\*\* //')
+      ```
+
+   e. Write inferred values to `.env` (only if not already set):
+
+      ```bash
+      for var in SA_USER SA_ROLE SNOW_UTILS_DB; do
+        val=$(eval echo \$$var)
+        [ -n "$val" ] && (grep -q "^${var}=" .env && \
+          sed -i '' "s/^${var}=.*/${var}=${val}/" .env || \
+          echo "${var}=${val}" >> .env)
+      done
+      ```
+
+   f. Leave `SA_PAT` empty — it will be created fresh during this replay.
+
+   **If .env exists and has all values:** Skip to step 4.
+
+4. **Check Status field and act accordingly:**
 
 | Status | Action |
 |--------|--------|
@@ -929,30 +990,30 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 | `COMPLETE` | Warn: "Resources already exist. Run 'remove' first or choose 'recreate' to cleanup and recreate." |
 | `IN_PROGRESS` | Use Resume Flow instead (partial creation) |
 
-1. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
+5. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
 
-2. **If Status is `REMOVED`**, extract values and display summary:
+6. **If Status is `REMOVED`**, extract values and display pre-populated summary:
 
 ```
-ℹ️  Replay from manifest will create:
+ℹ️  Replay from manifest — values pre-populated (no questions to re-answer):
 
-  Resources:
+  Resources to create:
     • Network Rule:   {SA_USER}_NETWORK_RULE
     • Network Policy: {SA_USER}_NETWORK_POLICY
     • Auth Policy:    {SA_USER}_AUTH_POLICY
     • Service User:   {SA_USER}
     • PAT:            {SA_USER}_PAT
 
-  Configuration:
-    User:     {SA_USER}
-    Role:     {SA_ROLE}
-    Database: {SNOW_UTILS_DB}
-    Comment:  {COMMENT_PREFIX}
+  Configuration (from manifest):
+    User:     {SA_USER}           (from manifest **User:** field)
+    Role:     {SA_ROLE}           (from manifest **Role:** field)
+    Database: {SNOW_UTILS_DB}     (from manifest **Database:** field)
+    Comment:  {COMMENT_PREFIX}    (from manifest **Comment:** field)
 
 Proceed with creation? [yes/no]
 ```
 
-1. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
+7. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
 
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
@@ -962,7 +1023,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 - CLI shows progress for each step automatically
 - **NO additional user prompts until complete**
 
-1. **Update manifest** status back to `COMPLETE` after successful creation
+8. **Update manifest** status back to `COMPLETE` after successful creation
 
 #### Resume Flow (Partial Creation Recovery)
 
