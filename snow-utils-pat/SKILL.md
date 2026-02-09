@@ -598,8 +598,14 @@ Proceed to Step 5b.
 
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --skip-network --output json
+  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
+  --default-expiry-days <DEFAULT_EXPIRY> --max-expiry-days <MAX_EXPIRY> \
+  --skip-network --output json
 ```
+
+> **⚠️ CRITICAL:** ALWAYS include `--default-expiry-days` and `--max-expiry-days` with the exact values from Step 3.
+> CoCo MUST NOT omit these flags or substitute different parameter names (e.g., `--expiry`, `--validity-days`).
+> The CLI defaults (15/365) only apply if the user explicitly chose the "Default" profile.
 
 **CLI shows progress:**
 
@@ -1072,8 +1078,12 @@ Proceed with creation? [yes/no]
 
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  --comment "{COMMENT_PREFIX}" create --user {SA_USER} --role {SA_ROLE} --db {SNOW_UTILS_DB}
+  --comment "{COMMENT_PREFIX}" create --user {SA_USER} --role {SA_ROLE} --db {SNOW_UTILS_DB} \
+  --default-expiry-days {DEFAULT_EXPIRY} --max-expiry-days {MAX_EXPIRY}
 ```
+
+> **⚠️ CRITICAL:** ALWAYS include `--default-expiry-days` and `--max-expiry-days` using values from the manifest.
+> NEVER omit these flags or use alternative parameter names. If manifest values are missing, use `--default-expiry-days 90 --max-expiry-days 365`.
 
 - CLI shows progress for each step automatically
 - **NO additional user prompts until complete**
@@ -1319,12 +1329,24 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 
 #### create
 
+> **⚠️ ALWAYS include `--default-expiry-days` and `--max-expiry-days` explicitly.**
+> These are the exact CLI parameter names. NEVER substitute (e.g., `--expiry`, `--validity-days`, `--pat-expiry`).
+
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
-  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --output json
+  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
+  --default-expiry-days <DEFAULT_EXPIRY> --max-expiry-days <MAX_EXPIRY> --output json
 ```
 
-**With custom expiry settings:**
+**Example with Snowflake defaults (15/365):**
+
+```bash
+uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+  create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
+  --default-expiry-days 15 --max-expiry-days 365 --output json
+```
+
+**Example with custom expiry (7/30):**
 
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
