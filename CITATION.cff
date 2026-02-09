@@ -3,7 +3,7 @@ message: "If you use this software, please cite it as below."
 type: software
 title: "Snow Utils Skills"
 abstract:
-  "CoCo skills for Snowflake automation tasks including Iceberg external volumes and Programmatic Access Tokens."
+  "Cortex Code skills for Snowflake automation tasks including Iceberg external volumes and Programmatic Access Tokens."
 authors:
   - family-names: "Sampath"
     given-names: "Kamesh"

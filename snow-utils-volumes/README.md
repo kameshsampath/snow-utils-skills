@@ -95,6 +95,6 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-v
 
 ## See Also
 
-- [SKILL.md](./SKILL.md) - Detailed workflow for CoCo
+- [SKILL.md](./SKILL.md) - Detailed workflow for Cortex Code
 - [snow-utils-pat](../snow-utils-pat/) - Service account PAT creation
 - [snow-utils-networks](../snow-utils-networks/) - Network rules & policies

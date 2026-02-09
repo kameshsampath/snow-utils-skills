@@ -604,7 +604,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 ```
 
 > **⚠️ CRITICAL:** ALWAYS include `--default-expiry-days` and `--max-expiry-days` with the exact values from Step 3.
-> CoCo MUST NOT omit these flags or substitute different parameter names (e.g., `--expiry`, `--validity-days`).
+> Cortex Code MUST NOT omit these flags or substitute different parameter names (e.g., `--expiry`, `--validity-days`).
 > The CLI defaults (15/365) only apply if the user explicitly chose the "Default" profile.
 
 **CLI shows progress:**
@@ -740,7 +740,7 @@ mkdir -p .snow-utils
 
 This manifest records all Snowflake resources created by snow-utils skills.
 Each skill section is bounded by START/END markers for easy identification.
-CoCo uses this manifest to track, audit, and cleanup resources.
+Cortex Code uses this manifest to track, audit, and cleanup resources.
 
 ---
 ```
@@ -749,7 +749,7 @@ CoCo uses this manifest to track, audit, and cleanup resources.
 
 **Update manifest AFTER EACH resource is successfully created (not at the end).**
 
-This enables recovery if CoCo loses context mid-creation.
+This enables recovery if Cortex Code loses context mid-creation.
 
 **After Step 1 (Network Rule created):**
 
@@ -944,7 +944,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 #### Replay Flow (Minimal Approvals)
 
 > **🚨 GOAL:** Replay is for less technical users who trust the setup. Minimize friction.
-> CoCo constructs summary from manifest (no dry-run needed), gets ONE confirmation, then executes.
+> Cortex Code constructs summary from manifest (no dry-run needed), gets ONE confirmation, then executes.
 
 **Trigger phrases:** "replay pat", "replay pat manifest", "recreate pat", "replay from manifest"
 

@@ -102,6 +102,6 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-p
 
 ## See Also
 
-- [SKILL.md](./SKILL.md) - Detailed workflow for CoCo
+- [SKILL.md](./SKILL.md) - Detailed workflow for Cortex Code
 - [snow-utils-networks](../snow-utils-networks/) - Additional network rules
 - [snow-utils-volumes](../snow-utils-volumes/) - External volume creation

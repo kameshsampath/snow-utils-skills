@@ -150,45 +150,49 @@ The manifest can be **exported and shared** with another developer so they can r
 ```mermaid
 sequenceDiagram
     participant Alice
-    participant CoCo as CoCo (Alice)
+    participant CC as Cortex Code (Alice)
     participant Email
     participant Bob
-    participant CoCo2 as CoCo (Bob)
+    participant CC2 as Cortex Code (Bob)
     participant SF as Snowflake
 
-    Note over Alice,CoCo: Alice has a working setup (all COMPLETE)
+    Note over Alice,CC: Alice has a working setup (all COMPLETE)
 
-    Alice->>CoCo: "export manifest for sharing"
-    CoCo->>CoCo: Verify all sections COMPLETE
-    CoCo->>CoCo: Copy manifest → hirc-duckdb-demo-manifest.md
-    CoCo->>CoCo: Set statuses to REMOVED
-    CoCo->>CoCo: Add # ADAPT markers on user-prefixed values
-    CoCo->>CoCo: Inject COCO_INSTRUCTION + shared_info
-    CoCo-->>Alice: Export saved to project root
+    Alice->>CC: "export manifest for sharing"
+    CC->>CC: Verify all sections COMPLETE
+    CC->>CC: Copy manifest → hirc-duckdb-demo-manifest.md
+    CC->>CC: Set statuses to REMOVED
+    CC->>CC: Add # ADAPT markers on user-prefixed values
+    CC->>CC: Inject COCO_INSTRUCTION + shared_info + required_skills
+    CC-->>Alice: Export saved to project root
 
     Alice->>Email: Send hirc-duckdb-demo-manifest.md
 
     Email-->>Bob: Receives manifest file
 
-    Bob->>CoCo2: Opens file, asks "setup from shared manifest"
-    CoCo2->>Bob: "Create project dir ./hirc-duckdb-demo?"
-    Bob-->>CoCo2: Yes
+    Bob->>CC2: Opens file, asks "setup from shared manifest"
+    CC2->>CC2: Reads COCO_INSTRUCTION, checks required_skills
+    CC2->>Bob: "Install missing skills? (hirc-duckdb-demo, snow-utils-pat, ...)"
+    Bob-->>CC2: Yes
+    CC2->>CC2: cortex skill add for each missing skill
+    CC2->>Bob: "Create project dir ./hirc-duckdb-demo?"
+    Bob-->>CC2: Yes
 
-    CoCo2->>CoCo2: Create dir, move manifest to .snow-utils/
-    CoCo2->>Bob: "Which Snowflake connection?"
-    Bob-->>CoCo2: Selects connection
+    CC2->>CC2: Create dir, move manifest to .snow-utils/
+    CC2->>Bob: "Which Snowflake connection?"
+    Bob-->>CC2: Selects connection
 
-    CoCo2->>SF: snow connection test
-    SF-->>CoCo2: Account, user (BOBS), URL
+    CC2->>SF: snow connection test
+    SF-->>CC2: Account, user (BOBS), URL
 
-    CoCo2->>Bob: Combined summary + adaptation screen
-    Note over CoCo2,Bob: Original (ALICE) → Your Value (BOBS)
-    Bob-->>CoCo2: Confirm all
+    CC2->>Bob: Combined summary + adaptation screen
+    Note over CC2,Bob: Original (ALICE) → Your Value (BOBS)
+    Bob-->>CC2: Confirm all
 
-    CoCo2->>SF: Create resources with adapted names
-    SF-->>CoCo2: All resources created
+    CC2->>SF: Create resources with adapted names
+    SF-->>CC2: All resources created
 
-    CoCo2-->>Bob: Setup complete!
+    CC2-->>Bob: Setup complete!
 ```
 
 ### Key Concepts
@@ -197,7 +201,8 @@ sequenceDiagram
 |---------|-------------|
 | **Export precondition** | All skill sections must be `COMPLETE` before export |
 | **Project-named file** | Export creates `{project_name}-manifest.md` in project root (not in `.snow-utils/`) |
-| **ADAPT markers** | User-prefixed values get `# ADAPT: user-prefixed` so CoCo offers name adaptation |
+| **ADAPT markers** | User-prefixed values get `# ADAPT: user-prefixed` so Cortex Code offers name adaptation |
+| **Self-installing** | Exported manifest includes `required_skills` with URLs — Cortex Code installs missing skills automatically |
 | **3-prompt replay** | Project directory → Connection name → Combined summary + adaptation → done |
 | **Canonical path rule** | Skills only read from `.snow-utils/snow-utils-manifest.md` — exported file is invisible to skill flows |
 
@@ -206,8 +211,11 @@ sequenceDiagram
 ```markdown
 <!-- COCO_INSTRUCTION: This is a shared snow-utils manifest.
      project_name: hirc-duckdb-demo
-     To set up: open this file in Cursor and ask "setup from shared manifest".
-     CoCo will create the project directory, move this file into place, and replay. -->
+     setup_steps:
+       1. Check if required skills are installed: cortex skill list
+       2. For each skill in ## required_skills NOT in the list, run: cortex skill add <url>
+       3. Once all skills installed, follow hirc-duckdb-demo SKILL.md "Setup from Shared Manifest Flow"
+     To trigger: ask "setup from shared manifest" -->
 
 # Snow-Utils Manifest
 
@@ -217,6 +225,11 @@ shared_date: 2026-02-07
 original_project_dir: hirc-duckdb-demo
 notes: |
   To replay: open in Cursor, ask "setup from shared manifest"
+
+## required_skills
+hirc-duckdb-demo: https://github.com/kameshsampath/kamesh-demo-skills/hirc-duckdb-demo
+snow-utils-pat: https://github.com/kameshsampath/snow-utils-skills/snow-utils-pat
+snow-utils-volumes: https://github.com/kameshsampath/snow-utils-skills/snow-utils-volumes
 
 ## project_recipe
 project_name: hirc-duckdb-demo
@@ -236,7 +249,7 @@ project_name: hirc-duckdb-demo
 
 ### Name Adaptation (Combined Summary Screen)
 
-When Bob replays, CoCo detects the prefix mismatch and shows one unified screen:
+When Bob replays, Cortex Code detects the prefix mismatch and shows one unified screen:
 
 ```
 Replaying shared manifest for: hirc-duckdb-demo
@@ -270,7 +283,7 @@ Options:
 snow-utils-skills/
 ├── common/                    # Shared Python utilities
 ├── snow-utils-pat/           # PAT skill
-│   ├── SKILL.md              # Skill workflow (for CoCo)
+│   ├── SKILL.md              # Skill workflow (for Cortex Code)
 │   ├── README.md             # User documentation
 │   └── scripts/              # CLI tools
 ├── snow-utils-networks/      # Networks skill

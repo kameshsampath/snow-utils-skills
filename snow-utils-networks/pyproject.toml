@@ -1,7 +1,7 @@
 [project]
 name = "snowflake-networks"
 version = "0.1.0"
-description = "CoCo skill for creating Snowflake network rules and policies"
+description = "Cortex Code skill for creating Snowflake network rules and policies"
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.0",

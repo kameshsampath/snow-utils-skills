@@ -75,7 +75,7 @@ This document tracks planned enhancements for v2. Created from design discussion
 
 **Current limitation:** `.env` holds single NW_RULE_NAME
 
-**Proposed:** Same pattern as PAT - manifest tracks all, CoCo offers choices
+**Proposed:** Same pattern as PAT - manifest tracks all, Cortex Code offers choices
 
 ---
 
@@ -91,7 +91,7 @@ This document tracks planned enhancements for v2. Created from design discussion
 
 **Proposed flow:**
 
-1. CoCo prompts for ALL required values (no .env read)
+1. Cortex Code prompts for ALL required values (no .env read)
 2. Creates resources
 3. Records to manifest with ALL config (no .env write)
 4. Replay reads from manifest only
@@ -151,7 +151,7 @@ When manifest has multiple resources:
 **Cleanup:**
 
 ```
-CoCo: "Found 3 network rules in manifest. Which to remove?"
+Cortex Code: "Found 3 network rules in manifest. Which to remove?"
   1. MYAPP_LOCAL_RULE (COMPLETE)
   2. MYAPP_GITHUB_RULE (COMPLETE)
   3. MYAPP_API_RULE (REMOVED)
@@ -161,7 +161,7 @@ CoCo: "Found 3 network rules in manifest. Which to remove?"
 **Replay:**
 
 ```
-CoCo: "Found 2 PATs in manifest. Which to replay?"
+Cortex Code: "Found 2 PATs in manifest. Which to replay?"
   1. MYAPP_RUNNER (REMOVED) - can replay
   2. MYAPP_READONLY (COMPLETE) - already exists
 ```
@@ -179,12 +179,12 @@ CoCo: "Found 2 PATs in manifest. Which to replay?"
 snow-utils cleanup --project MYAPP
 ```
 
-Or CoCo-driven:
+Or Cortex Code-driven:
 
 ```
 User: "Clean up MYAPP project"
 
-CoCo reads manifest, finds all MYAPP resources:
+Cortex Code reads manifest, finds all MYAPP resources:
 - 2 PATs
 - 3 Network Rules
 - 1 Volume
@@ -202,14 +202,14 @@ Executes cleanup in dependency order:
 
 ## 7. CLI Confirmation Handling for Non-Interactive Mode
 
-**Current:** CLI uses `@click.confirmation_option` which requires `--yes` flag in non-interactive context (CoCo bash).
+**Current:** CLI uses `@click.confirmation_option` which requires `--yes` flag in non-interactive context (Cortex Code bash).
 
-**Workaround:** SKILL.md instructs CoCo to add `--yes` to delete commands.
+**Workaround:** SKILL.md instructs Cortex Code to add `--yes` to delete commands.
 
 **Proposed:** CLI checks `--output json` mode and skips confirmation:
 
 ```python
-# Before (requires --yes in CoCo)
+# Before (requires --yes in Cortex Code)
 @click.confirmation_option(prompt="Delete this network rule?")
 def rule_delete_cmd(...):
 
@@ -228,7 +228,7 @@ def rule_delete_cmd(..., output: str):
 - `network.py policy delete`
 - `pat.py remove`
 
-**Pattern:** `--output json` = non-interactive (CoCo), `--output text` = interactive (CLI)
+**Pattern:** `--output json` = non-interactive (Cortex Code), `--output text` = interactive (CLI)
 
 ---
 

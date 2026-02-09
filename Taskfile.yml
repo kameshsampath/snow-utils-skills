@@ -10,7 +10,7 @@ tasks:
       - task --list
 
   skills:register:
-    desc: Register skills with CoCo (only if not already registered)
+    desc: Register skills with Cortex Code (only if not already registered)
     cmds:
       - |
         if cortex skill list 2>/dev/null | grep -q "{{.PWD}}$"; then
@@ -22,15 +22,15 @@ tasks:
         fi
 
   skills:reload:
-    desc: Clear CoCo cache to reload skills
+    desc: Clear Cortex Code cache to reload skills
     deps:
       - skills:register
     cmds:
-      - echo "Clearing CoCo cache..."
+      - echo "Clearing Cortex Code cache..."
       - rm -rf "{{.CORTEX_CONFIG}}/cache" 2>/dev/null || true
       - echo "✓ Cache cleared"
       - echo ""
-      - echo "⚠ Restart CoCo or start a new chat session for changes to take effect"
+      - echo "⚠ Restart Cortex Code or start a new chat session for changes to take effect"
 
   skills:list:
     desc: List installed skills
@@ -38,7 +38,7 @@ tasks:
       - cortex skill list
 
   skills:clean:
-    desc: Remove snow-utils skills from CoCo
+    desc: Remove snow-utils skills from Cortex Code
     cmds:
       - echo "Removing snow-utils skills..."
       - cortex skill remove "{{.PWD}}" 2>/dev/null || true

@@ -31,7 +31,7 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud stor
 
 - NEVER run SQL queries to discover/find/check values (no SHOW ROLES, SHOW DATABASES, SHOW EXTERNAL VOLUMES)
 - NEVER auto-populate empty .env values by querying Snowflake
-- NEVER use flags that bypass user interaction (except documented `--yes` for CoCo automation)
+- NEVER use flags that bypass user interaction (except documented `--yes` for Cortex Code automation)
 - NEVER assume user consent - always ask and wait for explicit confirmation
 - NEVER skip SQL/JSON in dry-run output - always show BOTH summary AND full SQL/JSON
 - NEVER hardcode admin roles - get admin_role from manifest
@@ -729,7 +729,7 @@ extvolume.py --no-prefix create --bucket my-bucket
 ## Replay Flow (Minimal Approvals)
 
 > **🚨 GOAL:** Replay is for less technical users who trust the setup. Minimize friction.
-> CoCo constructs summary from manifest (no dry-run needed), gets ONE confirmation, then executes.
+> Cortex Code constructs summary from manifest (no dry-run needed), gets ONE confirmation, then executes.
 
 **Trigger phrases:** "replay manifest", "replay volumes", "recreate external volume", "replay from manifest"
 

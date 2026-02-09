@@ -344,7 +344,7 @@ PostgreSQL interface direction:
   Outbound connections from PostgreSQL interface
 ```
 
-**CoCo Conversion:** Selected mode → `--mode <value>`
+**Cortex Code Conversion:** Selected mode → `--mode <value>`
 
 **Part 1c - Rule Type Selection (mode-dependent):**
 
@@ -388,7 +388,7 @@ Rule type:
   Specific external IP addresses to connect to
 ```
 
-**CoCo Conversion:** Selected type → `--type <value>`
+**Cortex Code Conversion:** Selected type → `--type <value>`
 
 **Part 2 - Value Input (type-dependent):**
 
@@ -415,7 +415,7 @@ Which IP sources should be allowed access?
   I'll specify IP ranges
 ```
 
-**CoCo Conversion Table (IPV4 only):**
+**Cortex Code Conversion Table (IPV4 only):**
 
 | User Selection | CLI Flag |
 |----------------|----------|
@@ -438,7 +438,7 @@ Enter hostname:port targets (comma-separated):
 Example: api.github.com:443, storage.googleapis.com:443
 ```
 
-**CoCo Conversion:** → `--values "<comma-separated-hosts>"`
+**Cortex Code Conversion:** → `--values "<comma-separated-hosts>"`
 
 **If type is AWSVPCEID:** Prompt for VPC endpoint IDs
 
@@ -447,7 +447,7 @@ Enter AWS VPC Endpoint IDs (comma-separated):
 Example: vpce-1234567890abcdef0
 ```
 
-**CoCo Conversion:** → `--values "<comma-separated-vpce-ids>"`
+**Cortex Code Conversion:** → `--values "<comma-separated-vpce-ids>"`
 
 **⚠️ STOP**: Wait for user input on ALL values.
 
@@ -574,7 +574,7 @@ This enables:
 
 ### Step 5: Create Resources
 
-**Execute (use --output json to skip CLI confirmation - CoCo handles it):**
+**Execute (use --output json to skip CLI confirmation - Cortex Code handles it):**
 
 ```bash
 uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
@@ -616,7 +616,7 @@ mkdir -p .snow-utils
 
 This manifest tracks Snowflake resources created by snow-utils skills.
 Each skill section is bounded by START/END markers for easy identification.
-CoCo can use this manifest to replay creation or cleanup resources.
+Cortex Code can use this manifest to replay creation or cleanup resources.
 
 ---
 ```
