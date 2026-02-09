@@ -101,6 +101,9 @@ project_name: <PROJECT_NAME>
 ## prereqs
 tools_verified: <TODAY_DATE>
 skills:
+
+## dependent_skills
+snow-utils-networks: https://github.com/kameshsampath/snow-utils-skills/snow-utils-networks
 EOF
 fi
 # Add this skill's source URL if not already present
@@ -110,6 +113,28 @@ chmod 600 .snow-utils/snow-utils-manifest.md
 ```
 
 > **`<PROJECT_NAME>` derivation:** Use the current directory name: `basename $(pwd)`. Example: if in `/home/user/hirc-duckdb-demo`, project_name = `hirc-duckdb-demo`. This enables manifest portability — another developer can recreate the project directory from the manifest.
+
+### Step 0b: Check Dependent Skills
+
+**Check if snow-utils-networks is installed (PAT uses it for network rules):**
+
+```bash
+cortex skill list 2>/dev/null | grep "snow-utils-networks" || echo "NOT INSTALLED"
+```
+
+**If not installed, ask user:**
+
+```
+Dependent skill required: snow-utils-networks
+URL: https://github.com/kameshsampath/snow-utils-skills/snow-utils-networks
+
+This skill is needed to create network rules for the PAT user.
+Install this skill? [yes/no]
+```
+
+**⚠️ STOP**: Wait for user confirmation.
+
+**If yes:** Run `cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-networks`.
 
 ### Step 1: Load and Merge Environment
 
