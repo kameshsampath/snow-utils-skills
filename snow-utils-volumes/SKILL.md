@@ -823,12 +823,36 @@ extvolume.py --no-prefix create --bucket my-bucket
 
 | Status | Action |
 |--------|--------|
-| `REMOVED` | Proceed with creation (resources don't exist) |
-| `COMPLETE` | Warn: "Resources already exist. Run 'delete' first or choose 'recreate' to cleanup and recreate." |
+| `REMOVED` | Proceed to step 6 (resources don't exist) |
+| `COMPLETE` | **Collision detected** — proceed to step 5 |
 
-5. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
+5. **If Status is `COMPLETE` — Collision Strategy:**
 
-6. **If Status is `REMOVED`**, extract values and display pre-populated summary:
+   ```
+   ⚠️ External volume resources already exist:
+
+     Resource                    Status
+     ─────────────────────────────────────
+     External Volume: {EXTERNAL_VOLUME_NAME}   EXISTS
+     S3 Bucket:       {BUCKET}                 EXISTS
+
+   Choose a strategy:
+   1. Use existing → skip creation, continue to next skill
+   2. Replace → run 'delete' then recreate (DESTRUCTIVE)
+   3. Rename → prompt for new volume name, create alongside existing
+   4. Cancel → stop replay
+   ```
+
+   **⚠️ STOP**: Wait for user choice.
+
+   | Choice | Action |
+   |--------|--------|
+   | **Use existing** | Skip volume creation entirely. |
+   | **Replace** | Confirm with "Type 'yes, destroy' to confirm". Run delete flow, then proceed to step 6. |
+   | **Rename** | Ask for new `EXTERNAL_VOLUME_NAME`. Update `.env` and proceed to step 6. |
+   | **Cancel** | Stop replay. |
+
+6. **Extract values and display pre-populated summary:**
 
 ```
 ℹ️  Replay from manifest — values pre-populated (no questions to re-answer):

@@ -880,9 +880,35 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
 | Status | Action |
 |--------|--------|
-| `REMOVED` | Proceed with creation (resources don't exist) |
-| `COMPLETE` | Warn: "Resources already exist. Run 'remove' first or choose 'recreate'" |
+| `REMOVED` | Proceed to step 5 (resources don't exist) |
+| `COMPLETE` | **Collision detected** — show collision strategy prompt |
 | `IN_PROGRESS` | Use Resume Flow instead (partial creation) |
+
+   **If Status is `COMPLETE` — Collision Strategy:**
+
+   ```
+   ⚠️ Network resources already exist:
+
+     Resource                    Status
+     ─────────────────────────────────────
+     Network Rule:   {NW_RULE_NAME}            EXISTS
+     Network Policy: {NW_RULE_NAME}_POLICY     EXISTS
+
+   Choose a strategy:
+   1. Use existing → skip creation, continue to next skill
+   2. Replace → run 'remove' then recreate (DESTRUCTIVE)
+   3. Rename → prompt for new rule name, create alongside existing
+   4. Cancel → stop replay
+   ```
+
+   **⚠️ STOP**: Wait for user choice.
+
+   | Choice | Action |
+   |--------|--------|
+   | **Use existing** | Skip network creation entirely. |
+   | **Replace** | Confirm with "Type 'yes, destroy' to confirm". Run Remove Flow, then proceed to step 5. |
+   | **Rename** | Ask for new `NW_RULE_NAME`. Derive new policy name. Update `.env` and proceed to step 5. |
+   | **Cancel** | Stop replay. |
 
 5. **Display pre-populated summary with single confirmation:**
 

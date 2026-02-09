@@ -1042,13 +1042,46 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 
 | Status | Action |
 |--------|--------|
-| `REMOVED` | Proceed with creation (resources don't exist) |
-| `COMPLETE` | Warn: "Resources already exist. Run 'remove' first or choose 'recreate' to cleanup and recreate." |
+| `REMOVED` | Proceed to step 6 (resources don't exist) |
+| `COMPLETE` | **Collision detected** — proceed to step 5 |
 | `IN_PROGRESS` | Use Resume Flow instead (partial creation) |
 
-5. **If Status is NOT `REMOVED`**, stop and inform user of appropriate action.
+5. **If Status is `COMPLETE` — Collision Strategy:**
 
-6. **If Status is `REMOVED`**, extract values and display pre-populated summary:
+   Resources already exist. Check which ones:
+
+   ```bash
+   snow sql -q "DESC USER {SA_USER}" 2>/dev/null && echo "EXISTS" || echo "NOT_FOUND"
+   ```
+
+   Show collision prompt:
+
+   ```
+   ⚠️ PAT resources already exist:
+
+     Resource                    Status
+     ─────────────────────────────────────
+     Service User:   {SA_USER}                  EXISTS
+     Network Rule:   {SA_USER}_NETWORK_RULE     EXISTS
+     Network Policy: {SA_USER}_NETWORK_POLICY   EXISTS
+
+   Choose a strategy:
+   1. Use existing → skip resource creation, generate fresh PAT only
+   2. Replace → run 'remove' then recreate all (DESTRUCTIVE)
+   3. Rename → prompt for new service user name, create alongside existing
+   4. Cancel → stop replay
+   ```
+
+   **⚠️ STOP**: Wait for user choice.
+
+   | Choice | Action |
+   |--------|--------|
+   | **Use existing** | Skip to PAT generation only (SA_PAT is always fresh). Update `.env` with existing values. |
+   | **Replace** | Confirm with "Type 'yes, destroy' to confirm". Run Remove Flow, then proceed to step 6. |
+   | **Rename** | Ask for new `SA_USER` name. Derive new resource names per naming convention. Update `.env` and proceed to step 6. |
+   | **Cancel** | Stop replay. |
+
+6. **Extract values and display pre-populated summary:**
 
 ```
 ℹ️  Replay from manifest — values pre-populated (no questions to re-answer):
