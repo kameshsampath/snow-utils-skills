@@ -668,6 +668,9 @@ This manifest records all Snowflake resources created by snow-utils skills.
 **Role:** {SA_ROLE}
 **Database:** {SNOW_UTILS_DB}
 **Comment:** {COMMENT_PREFIX}
+**Default Expiry (days):** {DEFAULT_EXPIRY}
+**Max Expiry (days):** {MAX_EXPIRY}
+**Actual Expiry:** {ACTUAL_EXPIRY}
 **Status:** COMPLETE
 
 | # | Type | Name | Location | Status |
@@ -753,6 +756,9 @@ This enables recovery if CoCo loses context mid-creation.
 **Role:** {SA_ROLE}
 **Database:** {SNOW_UTILS_DB}
 **Comment:** {COMMENT_PREFIX}
+**Default Expiry (days):** {DEFAULT_EXPIRY}
+**Max Expiry (days):** {MAX_EXPIRY}
+**Actual Expiry:** {ACTUAL_EXPIRY}
 **Status:** IN_PROGRESS
 
 ### Resources (creation order)
@@ -780,6 +786,9 @@ This enables recovery if CoCo loses context mid-creation.
 **Role:** {SA_ROLE}
 **Database:** {SNOW_UTILS_DB}
 **Comment:** {COMMENT_PREFIX}
+**Default Expiry (days):** {DEFAULT_EXPIRY}
+**Max Expiry (days):** {MAX_EXPIRY}
+**Actual Expiry:** {ACTUAL_EXPIRY}
 **Status:** COMPLETE
 
 ### Resources (creation order)
@@ -917,6 +926,9 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
    **Removed:** 2026-02-04 14:45:00
    **User:** {SA_USER}
    **Role:** {SA_ROLE}
+   **Default Expiry (days):** 90
+   **Max Expiry (days):** 365
+   **Actual Expiry:** 2026-04-05
    **Status:** REMOVED
    ```
 
@@ -985,18 +997,21 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
       SA_USER=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*User:\*\*" | head -1 | sed 's/\*\*User:\*\* //')
       SA_ROLE=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*Role:\*\*" | head -1 | sed 's/\*\*Role:\*\* //')
       SNOW_UTILS_DB=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*Database:\*\*" | head -1 | sed 's/\*\*Database:\*\* //')
+      PAT_DEFAULT_EXPIRY=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*Default Expiry (days):\*\*" | head -1 | sed 's/\*\*Default Expiry (days):\*\* //')
+      PAT_MAX_EXPIRY=$(grep -A30 "<!-- START -- snow-utils-pat" .snow-utils/snow-utils-manifest.md | grep "^\*\*Max Expiry (days):\*\*" | head -1 | sed 's/\*\*Max Expiry (days):\*\* //')
       ```
 
    e. **Validate extracted values** (grep validation):
 
       ```bash
-      for var in SA_USER SA_ROLE SNOW_UTILS_DB; do
+      for var in SA_USER SA_ROLE SNOW_UTILS_DB PAT_DEFAULT_EXPIRY PAT_MAX_EXPIRY; do
         val=$(eval echo \$$var)
         [ -z "$val" ] && echo "WARNING: Could not extract ${var} from manifest"
       done
       ```
 
       If any value is empty, ask user to enter manually or abort.
+      Note: `PAT_DEFAULT_EXPIRY` and `PAT_MAX_EXPIRY` are optional — if missing, use defaults (90/365).
 
    f. **Detect shared manifest and offer name adaptation:**
 
@@ -1044,6 +1059,11 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
     Role:     {SA_ROLE}           (from manifest **Role:** field)
     Database: {SNOW_UTILS_DB}     (from manifest **Database:** field)
     Comment:  {COMMENT_PREFIX}    (from manifest **Comment:** field)
+
+  Expiry settings (from manifest):
+    Default Expiry: {DEFAULT_EXPIRY} days
+    Max Expiry:     {MAX_EXPIRY} days
+    Previous Expiry Date: {ACTUAL_EXPIRY}  (new expiry will be recalculated)
 
 Proceed with creation? [yes/no]
 ```

@@ -227,6 +227,9 @@ project_name: hirc-duckdb-demo
 **User:** ALICE_HIRC_DUCKDB_DEMO_RUNNER  # ADAPT: user-prefixed
 **Role:** ALICE_HIRC_DUCKDB_DEMO_ACCESS  # ADAPT: user-prefixed
 **Database:** ALICE_SNOW_UTILS  # ADAPT: user-prefixed
+**Default Expiry (days):** 90
+**Max Expiry (days):** 365
+**Actual Expiry:** 2026-05-08
 ...
 <!-- END: snow-utils-pat -->
 ```
