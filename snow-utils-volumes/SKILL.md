@@ -39,7 +39,7 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud stor
 - NEVER skip manifest - always update manifest IMMEDIATELY after user input
 - NEVER leave .snow-utils unsecured - always chmod 700/600
 - NEVER delete .snow-utils directory or manifest file - preserve for audit/cleanup/replay
-- If .env values are empty, prompt user or run check_setup.py
+- If .env values are empty, prompt user or run `check-setup` CLI
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
@@ -641,21 +641,23 @@ CREATE OR REPLACE ICEBERG TABLE my_table (
 
 ## Tools
 
-### check_setup.py (from snow-utils-common)
+### check-setup (from snow-utils-common, via snow-utils dependency)
 
-**Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
+**Description:** Pre-flight check for snow-utils infrastructure (database + schemas).
 
 **Usage:**
 
 ```bash
-uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
+uv run --project <SKILL_DIR> check-setup
 ```
-
-**⚠️ DO NOT ADD ANY FLAGS.**
 
 **Options:**
 
-- `--quiet`, `-q`: Exit 0 if ready, 1 if not (scripting only)
+| Option | Short | Required | Default | Description |
+|--------|-------|----------|---------|-------------|
+| `--database` | `-d` | No | from `SNOW_UTILS_DB` env or `{USER}_SNOW_UTILS` | Database name to check/create |
+| `--run-setup` | - | No | false | Run setup SQL if infrastructure missing |
+| `--suggest` | - | No | false | Output suggested defaults as JSON |
 
 ### snow-utils-volumes CLI
 
@@ -1057,7 +1059,7 @@ Fix the PAT issue, then run "replay all" again to continue.
 
 **Connection not found:** Ensure SNOWFLAKE_DEFAULT_CONNECTION_NAME in .env matches a configured connection. Run `snow connection list` to see available connections.
 
-**Infrastructure not set up:** Run `uv run --project <SKILL_DIR> python -m snow_utils_common.check_setup` - it will prompt and offer to create.
+**Infrastructure not set up:** Run `uv run --project <SKILL_DIR> check-setup --run-setup` - it will check and offer to create the database and schemas.
 
 **IAM propagation delay:** Script uses exponential backoff. Run `verify` after a minute if needed.
 

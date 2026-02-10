@@ -20,7 +20,7 @@ Creates service users, network policies, authentication policies, and Programmat
 - **NEVER show .env file contents after PAT is written** - use redacted placeholder
 - **NEVER run raw SQL for cleanup** - ALWAYS use `snow-utils-pat remove` command (handles dependency order automatically)
 - **NEVER create resources without showing SQL and getting confirmation first**
-- If .env values are empty, prompt user or run check_setup.py
+- If .env values are empty, prompt user or run `check-setup` CLI
 
 **Writing Sensitive Values (SA_PAT):**
 
@@ -201,10 +201,10 @@ grep -E "^SNOW_UTILS_DB=" .env
 
 **If SNOW_UTILS_DB has value:** Skip to Step 3.
 
-**If empty**, run check_setup.py with --suggest flag:
+**If empty**, run `check-setup` with --suggest flag:
 
 ```bash
-uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --suggest
+uv run --project <SKILL_DIR> check-setup --suggest
 ```
 
 Parse the JSON response:
@@ -220,14 +220,14 @@ Parse the JSON response:
 **If user confirms setup**, run:
 
 ```bash
-uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --database <DB> --run-setup
+uv run --project <SKILL_DIR> check-setup --database <DB> --run-setup
 ```
 
 **After setup completes, update .env:**
 
 - `SNOW_UTILS_DB=<value user confirmed>`
 
-**Note:** SA_ROLE ({PROJECT}_ACCESS) is created in Step 5 by this skill, not by check_setup.
+**Note:** SA_ROLE ({PROJECT}_ACCESS) is created in Step 5 by this skill, not by `check-setup`.
 
 **Update memory:**
 
@@ -1327,21 +1327,23 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 
 ## Tools
 
-### check_setup.py (from snow-utils-common)
+### check-setup (from snow-utils-common, via snow-utils dependency)
 
-**Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
+**Description:** Pre-flight check for snow-utils infrastructure (database + schemas).
 
 **Usage:**
 
 ```bash
-uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
+uv run --project <SKILL_DIR> check-setup
 ```
-
-**DO NOT ADD ANY FLAGS.**
 
 **Options:**
 
-- `--quiet`, `-q`: Exit 0 if ready, 1 if not (scripting only)
+| Option | Short | Required | Default | Description |
+|--------|-------|----------|---------|-------------|
+| `--database` | `-d` | No | from `SNOW_UTILS_DB` env or `{USER}_SNOW_UTILS` | Database name to check/create |
+| `--run-setup` | - | No | false | Run setup SQL if infrastructure missing |
+| `--suggest` | - | No | false | Output suggested defaults as JSON |
 
 ### snow-utils-pat CLI
 
@@ -1573,7 +1575,7 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 
 ## Troubleshooting
 
-**Infrastructure not set up:** Run `uv run --project <SKILL_DIR> python -m snow_utils_common.check_setup` - it will prompt and offer to create.
+**Infrastructure not set up:** Run `uv run --project <SKILL_DIR> check-setup --run-setup` - it will check and offer to create the database and schemas.
 
 **Network policy blocking:** Ensure your IP is in the network rule. Use --local-ip to specify.
 

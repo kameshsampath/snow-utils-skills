@@ -25,7 +25,7 @@ Creates and manages network rules and policies for IP-based access control in Sn
 - NEVER assume user consent - always ask and wait for explicit confirmation
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
 - **NEVER run raw SQL for cleanup** - ALWAYS use CLI commands (handles dependency order and detach/reattach)
-- If .env values are empty, prompt user or run check_setup.py
+- If .env values are empty, prompt user or run `check-setup` CLI
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
@@ -148,10 +148,10 @@ If memory has `infra_ready: true` with `snow_utils_db` value:
 grep -E "^SNOW_UTILS_DB=" .env
 ```
 
-**If SNOW_UTILS_DB is empty**, run check_setup.py first:
+**If SNOW_UTILS_DB is empty**, run `check-setup` first:
 
 ```bash
-uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup --suggest
+uv run --project <SKILL_DIR> check-setup --suggest
 ```
 
 If not ready, prompt user and run with `--run-setup`.
@@ -1066,21 +1066,23 @@ Fix the PAT issue, then run "replay all" again to continue.
 
 ## Tools
 
-### check_setup.py (from snow-utils-common)
+### check-setup (from snow-utils-common, via snow-utils dependency)
 
-**Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
+**Description:** Pre-flight check for snow-utils infrastructure (database + schemas).
 
 **Usage:**
 
 ```bash
-uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
+uv run --project <SKILL_DIR> check-setup
 ```
-
-**⚠️ DO NOT ADD ANY FLAGS.**
 
 **Options:**
 
-- `--quiet`, `-q`: Exit 0 if ready, 1 if not (scripting only)
+| Option | Short | Required | Default | Description |
+|--------|-------|----------|---------|-------------|
+| `--database` | `-d` | No | from `SNOW_UTILS_DB` env or `{USER}_SNOW_UTILS` | Database name to check/create |
+| `--run-setup` | - | No | false | Run setup SQL if infrastructure missing |
+| `--suggest` | - | No | false | Output suggested defaults as JSON |
 
 ### snow-utils-networks CLI
 
@@ -1287,7 +1289,7 @@ If you need IPv6 support, you would need to create a separate network rule with 
 
 ## Troubleshooting
 
-**Infrastructure not set up:** Run `uv run --project <SKILL_DIR> python -m snow_utils_common.check_setup` - it will prompt and offer to create.
+**Infrastructure not set up:** Run `uv run --project <SKILL_DIR> check-setup --run-setup` - it will check and offer to create the database and schemas.
 
 **Permission denied:** Ensure admin_role (from manifest, defaults to SECURITYADMIN) has CREATE NETWORK RULE and CREATE NETWORK POLICY privileges.
 
