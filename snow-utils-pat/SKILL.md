@@ -20,6 +20,7 @@ Creates service users, network policies, authentication policies, and Programmat
 - **NEVER show .env file contents after PAT is written** - use redacted placeholder
 - **NEVER run raw SQL for cleanup** - ALWAYS use `snow-utils-pat remove` command (handles dependency order automatically)
 - **NEVER create resources without showing SQL and getting confirmation first**
+- **NEVER offer to drop SNOW_UTILS_DB** - it is shared infrastructure; `remove` only drops resources *inside* it (policies, schemas), never the database itself
 - If .env values are empty, prompt user or run `check-setup` CLI
 
 **Writing Sensitive Values (SA_PAT):**
