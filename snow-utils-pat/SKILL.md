@@ -1522,6 +1522,29 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 - Updated .env with all values
 - Cleanup manifest (snow-utils-manifest.md)
 
+## SQL Reference (Snowflake Documentation)
+
+> These links help Cortex Code infer correct SQL syntax when previewing or troubleshooting.
+
+| Statement | Documentation |
+|-----------|---------------|
+| `CREATE USER` | https://docs.snowflake.com/en/sql-reference/sql/create-user |
+| `DROP USER` | https://docs.snowflake.com/en/sql-reference/sql/drop-user |
+| `CREATE ROLE` | https://docs.snowflake.com/en/sql-reference/sql/create-role |
+| `GRANT ROLE` | https://docs.snowflake.com/en/sql-reference/sql/grant-role |
+| `CREATE NETWORK RULE` | https://docs.snowflake.com/en/sql-reference/sql/create-network-rule |
+| `DROP NETWORK RULE` | https://docs.snowflake.com/en/sql-reference/sql/drop-network-rule |
+| `CREATE NETWORK POLICY` | https://docs.snowflake.com/en/sql-reference/sql/create-network-policy |
+| `DROP NETWORK POLICY` | https://docs.snowflake.com/en/sql-reference/sql/drop-network-policy |
+| `CREATE AUTHENTICATION POLICY` | https://docs.snowflake.com/en/sql-reference/sql/create-authentication-policy |
+| `ALTER USER ... SET AUTHENTICATION POLICY` | https://docs.snowflake.com/en/sql-reference/sql/alter-user |
+| `ALTER USER ... UNSET AUTHENTICATION POLICY` | https://docs.snowflake.com/en/sql-reference/sql/alter-user |
+| `ALTER USER ... UNSET NETWORK_POLICY` | https://docs.snowflake.com/en/sql-reference/sql/alter-user |
+| `ALTER USER ... ADD PROGRAMMATIC ACCESS TOKEN` | https://docs.snowflake.com/en/sql-reference/sql/alter-user |
+| `ALTER USER ... REMOVE PROGRAMMATIC ACCESS TOKEN` | https://docs.snowflake.com/en/sql-reference/sql/alter-user |
+| `GRANT ... ON SCHEMA` | https://docs.snowflake.com/en/sql-reference/sql/grant-privilege |
+| `MANAGE GRANTS` | https://docs.snowflake.com/en/sql-reference/sql/grant-privilege |
+
 ## Troubleshooting
 
 **Infrastructure not set up:** Run `uv run --project <SKILL_DIR> python -m snow_utils_common.check_setup` - it will prompt and offer to create.

@@ -982,6 +982,19 @@ All resources recreated successfully.
 Fix the PAT issue, then run "replay all" again to continue.
 ```
 
+## SQL Reference (Snowflake Documentation)
+
+> These links help Cortex Code infer correct SQL syntax when previewing or troubleshooting.
+
+| Statement | Documentation |
+|-----------|---------------|
+| `CREATE EXTERNAL VOLUME` | https://docs.snowflake.com/en/sql-reference/sql/create-external-volume |
+| `ALTER EXTERNAL VOLUME` | https://docs.snowflake.com/en/sql-reference/sql/alter-external-volume |
+| `DROP EXTERNAL VOLUME` | https://docs.snowflake.com/en/sql-reference/sql/drop-external-volume |
+| `DESC EXTERNAL VOLUME` | https://docs.snowflake.com/en/sql-reference/sql/desc-external-volume |
+| `SHOW EXTERNAL VOLUMES` | https://docs.snowflake.com/en/sql-reference/sql/show-external-volumes |
+| `CREATE ICEBERG TABLE` (Snowflake catalog) | https://docs.snowflake.com/en/sql-reference/sql/create-iceberg-table-snowflake |
+
 ## Troubleshooting
 
 **Connection not found:** Ensure SNOWFLAKE_DEFAULT_CONNECTION_NAME in .env matches a configured connection. Run `snow connection list` to see available connections.

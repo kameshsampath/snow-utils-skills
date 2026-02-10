@@ -1191,6 +1191,24 @@ If you need IPv6 support, you would need to create a separate network rule with 
 - Network policy (optional, linked to rule)
 - Updated .env with all values
 
+## SQL Reference (Snowflake Documentation)
+
+> These links help Cortex Code infer correct SQL syntax when previewing or troubleshooting.
+
+| Statement | Documentation |
+|-----------|---------------|
+| `CREATE NETWORK RULE` | https://docs.snowflake.com/en/sql-reference/sql/create-network-rule |
+| `ALTER NETWORK RULE` | https://docs.snowflake.com/en/sql-reference/sql/alter-network-rule |
+| `DROP NETWORK RULE` | https://docs.snowflake.com/en/sql-reference/sql/drop-network-rule |
+| `SHOW NETWORK RULES` | https://docs.snowflake.com/en/sql-reference/sql/show-network-rules |
+| `CREATE NETWORK POLICY` | https://docs.snowflake.com/en/sql-reference/sql/create-network-policy |
+| `ALTER NETWORK POLICY` | https://docs.snowflake.com/en/sql-reference/sql/alter-network-policy |
+| `DROP NETWORK POLICY` | https://docs.snowflake.com/en/sql-reference/sql/drop-network-policy |
+| `SHOW NETWORK POLICIES` | https://docs.snowflake.com/en/sql-reference/sql/show-network-policies |
+| `ALTER USER ... SET NETWORK POLICY` | https://docs.snowflake.com/en/sql-reference/sql/alter-user |
+| `ALTER USER ... UNSET NETWORK_POLICY` | https://docs.snowflake.com/en/sql-reference/sql/alter-user |
+| `GRANT ... ON SCHEMA` | https://docs.snowflake.com/en/sql-reference/sql/grant-privilege |
+
 ## Troubleshooting
 
 **Infrastructure not set up:** Run `uv run --project <SKILL_DIR> python -m snow_utils_common.check_setup` - it will prompt and offer to create.
