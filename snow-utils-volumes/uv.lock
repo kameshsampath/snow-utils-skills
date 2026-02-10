@@ -122,19 +122,11 @@ name = "iceberg-external-volume"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "boto3" },
-    { name = "click" },
-    { name = "python-dotenv" },
-    { name = "snow-utils-common" },
+    { name = "snow-utils" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "boto3", specifier = ">=1.35.0" },
-    { name = "click", specifier = ">=8.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "snow-utils-common", editable = "../common" },
-]
+requires-dist = [{ name = "snow-utils", git = "https://github.com/kameshsampath/snow-utils" }]
 
 [[package]]
 name = "idna"
@@ -212,18 +204,24 @@ wheels = [
 ]
 
 [[package]]
+name = "snow-utils"
+version = "0.1.0"
+source = { git = "https://github.com/kameshsampath/snow-utils#099ea10218d017ac011c8f43c55840a1cfe3ae18" }
+dependencies = [
+    { name = "boto3" },
+    { name = "click" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+    { name = "snow-utils-common" },
+]
+
+[[package]]
 name = "snow-utils-common"
 version = "0.1.0"
-source = { editable = "../common" }
+source = { git = "https://github.com/kameshsampath/snow-utils?subdirectory=common#099ea10218d017ac011c8f43c55840a1cfe3ae18" }
 dependencies = [
     { name = "click" },
     { name = "requests" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.0" },
-    { name = "requests", specifier = ">=2.28" },
 ]
 
 [[package]]
