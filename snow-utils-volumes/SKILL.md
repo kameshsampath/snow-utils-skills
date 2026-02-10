@@ -388,28 +388,25 @@ uv run --project <SKILL_DIR> snow-utils-volumes \
   create --bucket ${BUCKET} --dry-run
 ```
 
-**🔴 CRITICAL: Run the CLI dry-run and show its COMPLETE output to the user.**
+**🔴 CRITICAL: Run the CLI dry-run, capture its output, and present it IN YOUR RESPONSE as formatted text.**
 
-> **DO NOT** construct your own summary box, table, SQL, or JSON. The CLI generates
-> a full preview including resource summary, IAM policy JSON, trust policy JSON,
-> and Snowflake SQL. Run the command and display ALL of its output.
+> Terminal output gets collapsed/truncated by the UI. The user cannot see it.
+> You MUST copy the dry-run output into your chat response so the user can read it.
 
-The CLI `--dry-run` output includes:
-1. **AWS resource summary** (bucket, IAM role, IAM policy)
-2. **Snowflake resource summary** (external volume name)
-3. **Full IAM policy JSON** (S3 access permissions)
-4. **Full IAM trust policy JSON** (Snowflake cross-account trust)
-5. **Full Snowflake SQL** (CREATE EXTERNAL VOLUME)
+**After the command completes, you MUST:**
+
+1. Read the full terminal output from the command
+2. Copy-paste the ENTIRE output into your response as a fenced code block
+3. The output includes AWS resource summary, Snowflake summary, IAM policy JSON, trust policy JSON, and CREATE EXTERNAL VOLUME SQL
 
 > **Note:** External volumes are account-level objects in Snowflake (no database/schema prefix).
 
-**You MUST present the ENTIRE CLI output to the user.** Do not truncate, summarize, or restyle it.
+**❌ WRONG:** Just running the command and letting the terminal output speak for itself (it gets truncated).
+**❌ WRONG:** Constructing your own summary box or template instead of showing CLI output.
+**❌ WRONG:** Saying "see the output above" -- the user CANNOT see collapsed terminal output.
+**✅ RIGHT:** Pasting the full CLI output in your response.
 
-**❌ WRONG:** Constructing your own summary box or template and hiding the SQL/JSON.
-**❌ WRONG:** Showing only "45 more lines" collapsed output.
-**✅ RIGHT:** Displaying the full CLI dry-run output including all SQL and JSON.
-
-> 🔄 **On pause/resume:** Re-run `--dry-run` and display the complete output again before asking for confirmation.
+> 🔄 **On pause/resume:** Re-run `--dry-run` and paste the complete output again before asking for confirmation.
 
 **⚠️ STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 
@@ -876,8 +873,7 @@ snow-utils-volumes verify --volume-name MY_EXTERNAL_VOLUME
      create --bucket {BUCKET} --dry-run
    ```
 
-   **🔴 CRITICAL:** Display the FULL output of this command -- both the resource summary AND the SQL/JSON statements.
-   **DO NOT** construct your own summary box or skip the SQL/JSON. Run the command and show its complete output.
+   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result into your response as a fenced code block so the user can see the resource summary AND all SQL/JSON statements.
 
    Then ask:
 

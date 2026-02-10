@@ -499,10 +499,10 @@ Then continue to Step 4.
 
 ### Step 4: Preview (Dry Run)
 
-**🔴 CRITICAL: Run the CLI dry-run and show its COMPLETE output to the user.**
+**🔴 CRITICAL: Run the CLI dry-run, capture its output, and present it IN YOUR RESPONSE as formatted text.**
 
-> **DO NOT** construct your own summary box, table, or SQL. The CLI generates both a
-> resource summary AND the full SQL preview. Run the command and display ALL of its output.
+> Terminal output gets collapsed/truncated by the UI. The user cannot see it.
+> You MUST copy the dry-run output into your chat response so the user can read it.
 
 **Execute:**
 
@@ -511,17 +511,41 @@ uv run --project <SKILL_DIR> snow-utils-pat \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --dry-run
 ```
 
-The CLI `--dry-run` output includes:
-1. **Resource summary** (user, role, database, PAT name, CIDRs)
-2. **Full SQL** for every step (CREATE USER, CREATE NETWORK RULE, CREATE AUTHENTICATION POLICY, ADD PAT)
+**After the command completes, you MUST:**
 
-**You MUST present the ENTIRE CLI output to the user.** Do not truncate, summarize, or restyle it.
+1. Read the full terminal output from the command
+2. Copy-paste the ENTIRE output into your response as a fenced code block
+3. The output includes both a resource summary AND full SQL for every step
 
-**❌ WRONG:** Constructing your own summary box or table and hiding the SQL.
-**❌ WRONG:** Showing only "45 more lines" collapsed output.
-**✅ RIGHT:** Displaying the full CLI dry-run output including all SQL statements.
+**❌ WRONG:** Just running the command and letting the terminal output speak for itself (it gets truncated).
+**❌ WRONG:** Constructing your own summary box or table instead of showing CLI output.
+**❌ WRONG:** Saying "see the output above" -- the user CANNOT see collapsed terminal output.
+**✅ RIGHT:** Pasting the full CLI output in your response like this:
 
-> 🔄 **On pause/resume:** Re-run `--dry-run` and display the complete output again before asking for confirmation.
+````
+Here is the dry-run preview:
+
+```
+==================================================
+Snowflake PAT Manager
+  [DRY RUN]
+==================================================
+User:     ...
+Role:     ...
+...
+SQL that would be executed:
+────────────────────────────────────────────────────────────
+-- Step 1: Create service user
+USE ROLE ACCOUNTADMIN;
+CREATE USER IF NOT EXISTS ...
+...
+────────────────────────────────────────────────────────────
+```
+
+Proceed with creating these resources? [yes/no]
+````
+
+> 🔄 **On pause/resume:** Re-run `--dry-run` and paste the complete output again before asking for confirmation.
 
 **COMMENT Pattern:** `{DEMO_CONTEXT} {resource_type} - managed by snow-utils-pat`
 
@@ -1078,8 +1102,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
      --default-expiry-days {DEFAULT_EXPIRY} --max-expiry-days {MAX_EXPIRY} --dry-run
    ```
 
-   **🔴 CRITICAL:** Display the FULL output of this command -- both the resource summary AND the SQL statements.
-   **DO NOT** construct your own summary box or skip the SQL. Run the command and show its complete output.
+   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result into your response as a fenced code block so the user can see the resource summary AND all SQL statements.
 
    Then ask:
 

@@ -526,20 +526,21 @@ uv run --project <SKILL_DIR> snow-utils-networks \
   [--policy <POLICY_NAME>] --dry-run
 ```
 
-**🔴 CRITICAL: Run the CLI dry-run and show its COMPLETE output to the user.**
+**🔴 CRITICAL: Run the CLI dry-run, capture its output, and present it IN YOUR RESPONSE as formatted text.**
 
-> **DO NOT** construct your own summary box, table, or SQL. The CLI generates both a
-> resource summary AND the full SQL preview. Run the command and display ALL of its output.
+> Terminal output gets collapsed/truncated by the UI. The user cannot see it.
+> You MUST copy the dry-run output into your chat response so the user can read it.
 
-The CLI `--dry-run` output includes:
-1. **Resource summary** (rule name, mode, type, CIDRs)
-2. **Full SQL** (CREATE NETWORK RULE, CREATE NETWORK POLICY)
+**After the command completes, you MUST:**
 
-**You MUST present the ENTIRE CLI output to the user.** Do not truncate, summarize, or restyle it.
+1. Read the full terminal output from the command
+2. Copy-paste the ENTIRE output into your response as a fenced code block
+3. The output includes both a resource summary AND full SQL (CREATE NETWORK RULE, CREATE NETWORK POLICY)
 
-**❌ WRONG:** Constructing your own summary box or table and hiding the SQL.
-**❌ WRONG:** Showing only "45 more lines" collapsed output.
-**✅ RIGHT:** Displaying the full CLI dry-run output including all SQL statements.
+**❌ WRONG:** Just running the command and letting the terminal output speak for itself (it gets truncated).
+**❌ WRONG:** Constructing your own summary box or table instead of showing CLI output.
+**❌ WRONG:** Saying "see the output above" -- the user CANNOT see collapsed terminal output.
+**✅ RIGHT:** Pasting the full CLI output in your response.
 
 **COMMENT Pattern:** `{CONTEXT} {resource_type} - managed by snow-utils-networks`
 
@@ -549,7 +550,7 @@ The CLI `--dry-run` output includes:
 - Example: `MYAPP_RUNNER_NETWORK_RULE` → `MYAPP`
 - Can be overridden via root CLI option: `snow-utils-networks --comment "MY_PROJECT" rule create ...`
 
-> 🔄 **On pause/resume:** Re-run `--dry-run` and display the complete output again before asking for confirmation.
+> 🔄 **On pause/resume:** Re-run `--dry-run` and paste the complete output again before asking for confirmation.
 
 **⚠️ STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 
@@ -901,8 +902,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
      [--policy {NW_RULE_NAME}_POLICY] --dry-run
    ```
 
-   **🔴 CRITICAL:** Display the FULL output of this command -- both the resource summary AND the SQL statements.
-   **DO NOT** construct your own summary box or skip the SQL. Run the command and show its complete output.
+   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result into your response as a fenced code block so the user can see the resource summary AND all SQL statements.
 
    Then ask:
 
