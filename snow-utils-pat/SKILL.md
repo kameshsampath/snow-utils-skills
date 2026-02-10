@@ -1503,7 +1503,7 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 
 ## Troubleshooting
 
-**Infrastructure not set up:** Run `python -m snow_utils_common.check_setup` from common - it will prompt and offer to create.
+**Infrastructure not set up:** Run `uv run --project <SKILL_DIR> python -m snow_utils_common.check_setup` - it will prompt and offer to create.
 
 **Network policy blocking:** Ensure your IP is in the network rule. Use --local-ip to specify.
 

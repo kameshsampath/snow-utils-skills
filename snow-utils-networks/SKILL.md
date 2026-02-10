@@ -1176,7 +1176,7 @@ If you need IPv6 support, you would need to create a separate network rule with 
 
 ## Troubleshooting
 
-**Infrastructure not set up:** Run `python -m snow_utils_common.check_setup` from common - it will prompt and offer to create.
+**Infrastructure not set up:** Run `uv run --project <SKILL_DIR> python -m snow_utils_common.check_setup` - it will prompt and offer to create.
 
 **Permission denied:** Ensure admin_role (from manifest, defaults to SECURITYADMIN) has CREATE NETWORK RULE and CREATE NETWORK POLICY privileges.
 

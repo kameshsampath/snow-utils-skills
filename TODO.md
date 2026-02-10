@@ -224,9 +224,9 @@ def rule_delete_cmd(..., output: str):
 
 **Affected commands:**
 
-- `network.py rule delete`
-- `network.py policy delete`
-- `pat.py remove`
+- `snow-utils-networks rule delete`
+- `snow-utils-networks policy delete`
+- `snow-utils-pat remove`
 
 **Pattern:** `--output json` = non-interactive (Cortex Code), `--output text` = interactive (CLI)
 

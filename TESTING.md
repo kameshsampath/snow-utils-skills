@@ -159,19 +159,19 @@ This document tracks test scenarios for PAT, Networks, and Volumes skills.
 ### Full PAT Cleanup
 
 ```bash
-set -a && source .env && set +a && uv run --project snow-utils-pat python snow-utils-pat/scripts/pat.py remove --user $SA_USER --db $SNOW_UTILS_DB
+set -a && source .env && set +a && uv run --project snow-utils-pat snow-utils-pat remove --user $SA_USER --db $SNOW_UTILS_DB
 ```
 
 ### Full Networks Cleanup
 
 ```bash
-set -a && source .env && set +a && uv run --project snow-utils-networks python snow-utils-networks/scripts/network.py rule delete --name $NW_RULE_NAME --db $NW_RULE_DB
+set -a && source .env && set +a && uv run --project snow-utils-networks snow-utils-networks rule delete --name $NW_RULE_NAME --db $NW_RULE_DB
 ```
 
 ### Full Volumes Cleanup
 
 ```bash
-set -a && source .env && set +a && uv run --project snow-utils-volumes python snow-utils-volumes/scripts/extvolume.py delete --bucket $BUCKET --delete-bucket --force --yes
+set -a && source .env && set +a && uv run --project snow-utils-volumes snow-utils-volumes delete --bucket $BUCKET --delete-bucket --force --yes
 ```
 
 ### Reset Test Environment

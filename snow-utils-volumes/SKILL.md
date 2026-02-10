@@ -974,7 +974,7 @@ Fix the PAT issue, then run "replay all" again to continue.
 
 **Connection not found:** Ensure SNOWFLAKE_DEFAULT_CONNECTION_NAME in .env matches a configured connection. Run `snow connection list` to see available connections.
 
-**Infrastructure not set up:** Run `python -m snow_utils_common.check_setup` from common - it will prompt and offer to create.
+**Infrastructure not set up:** Run `uv run --project <SKILL_DIR> python -m snow_utils_common.check_setup` - it will prompt and offer to create.
 
 **IAM propagation delay:** Script uses exponential backoff. Run `verify` after a minute if needed.
 

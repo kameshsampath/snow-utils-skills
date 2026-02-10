@@ -9,7 +9,7 @@
 A collection of skills that enable natural language automation of common Snowflake infrastructure tasks. Ask Cortex Code to create service accounts, network rules, or external volumes - it handles the complexity.
 
 > [!NOTE]
-> This repository contains the **skills** (SKILL.md + scripts). The source code is maintained in [snow-utils](https://github.com/kameshsampath/snow-utils).
+> This repository contains the **skills** (SKILL.md files). Scripts are consumed as CLI entry points via the [snow-utils](https://github.com/kameshsampath/snow-utils) git dependency.
 
 ## Skills
 
@@ -281,19 +281,18 @@ Options:
 
 ```
 snow-utils-skills/
-├── common/                    # Shared Python utilities
 ├── snow-utils-pat/           # PAT skill
 │   ├── SKILL.md              # Skill workflow (for Cortex Code)
 │   ├── README.md             # User documentation
-│   └── scripts/              # CLI tools
+│   └── pyproject.toml        # Declares snow-utils git dependency
 ├── snow-utils-networks/      # Networks skill
 │   ├── SKILL.md
 │   ├── README.md
-│   └── scripts/
+│   └── pyproject.toml
 ├── snow-utils-volumes/       # Volumes skill
 │   ├── SKILL.md
 │   ├── README.md
-│   └── scripts/
+│   └── pyproject.toml
 ├── TESTING.md                # Test cases for all skills
 └── TODO.md                   # v2 roadmap
 ```
