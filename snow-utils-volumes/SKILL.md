@@ -39,6 +39,7 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud stor
 - NEVER skip manifest - always update manifest IMMEDIATELY after user input
 - NEVER leave .snow-utils unsecured - always chmod 700/600
 - NEVER delete .snow-utils directory or manifest file - preserve for audit/cleanup/replay
+- **NEVER offer to drop SNOW_UTILS_DB** - it is shared infrastructure; cleanup only drops resources *inside* it, never the database itself
 - If .env values are empty, prompt user or run `check-setup` CLI
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
