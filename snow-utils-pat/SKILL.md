@@ -1347,6 +1347,14 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 
 **Description:** Creates and manages Snowflake PATs with network and auth policies.
 
+**Global Options (BEFORE command):**
+
+| Option | Short | Env Var | Default | Description |
+|--------|-------|---------|---------|-------------|
+| `--verbose` | `-v` | - | false | Enable verbose output |
+| `--debug` | `-d` | - | false | Enable debug output (shows SQL and subprocess commands) |
+| `--comment` | `-c` | `SNOW_UTILS_COMMENT` | auto | Comment prefix for SQL resources (inferred from SA_USER if not provided) |
+
 **CRITICAL RULES FOR COCO:**
 
 | Rule | Description |
@@ -1434,18 +1442,27 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 
 **Options:**
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `--user` | Yes | - | Service user name |
-| `--role` | Yes | - | PAT role restriction |
-| `--admin-role` | No | From manifest | Role for creating policies |
-| `--db` | Yes | - | Database for policy objects |
-| `--dry-run` | No | false | Preview SQL without executing |
-| `--output json` | No | text | Machine-readable output |
-| `--local-ip` | No | auto-detect | Override IP for network rule |
-| `--default-expiry-days` | No | 15 | PAT default expiry (Snowflake default) |
-| `--max-expiry-days` | No | 365 | PAT max expiry (Snowflake default) |
-| `--dot-env-file` | No | - | Write SA_PAT directly to this .env file (prevents token leaking in shell) |
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--user` | `-u` | `SA_USER` | Yes | - | Service user name |
+| `--role` | `-r` | `SA_ROLE` | Yes | - | PAT role restriction |
+| `--db` | `-d` | `SNOW_UTILS_DB` | Yes | - | Database for policy objects |
+| `--pat-name` | - | `PAT_NAME` | No | `{USER}_PAT` | Name for the PAT token |
+| `--rotate/--no-rotate` | - | - | No | true | Rotate existing PAT |
+| `--env-path` | - | - | No | `.env` | Path to .env file |
+| `--skip-verify` | - | - | No | false | Skip connection verification after creation |
+| `--allow-local/--no-local` | - | - | No | true | Include auto-detected local IP |
+| `--allow-gh` | - | - | No | false | Include GitHub Actions IPs |
+| `--allow-google` | - | - | No | false | Include Google Cloud IPs |
+| `--extra-cidrs` | - | - | No | - | Additional CIDRs (can be repeated) |
+| `--default-expiry-days` | - | - | No | 15 | PAT default expiry (Snowflake default) |
+| `--max-expiry-days` | - | - | No | 365 | PAT max expiry (Snowflake default) |
+| `--dry-run` | - | - | No | false | Preview SQL without executing |
+| `--admin-role` | `-a` | - | No | `accountadmin` | Admin role for creating resources |
+| `--force` | `-f` | - | No | false | Overwrite existing network rule/policy (CREATE OR REPLACE) |
+| `--output` | `-o` | - | No | `text` | Output format: `text` or `json` |
+| `--skip-network` | - | - | No | false | Skip network rule/policy creation (when delegating to snow-utils-networks) |
+| `--dot-env-file` | - | - | No | - | Write SA_PAT directly to this .env file (prevents token leaking in shell) |
 
 #### remove
 
@@ -1459,12 +1476,16 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 
 **Options:**
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `--user` | Yes | - | Service user to remove |
-| `--db` | Yes | - | Database containing policies |
-| `--admin-role` | No | From manifest | Role for dropping resources |
-| `--dry-run` | No | false | Preview DROP statements |
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--user` | `-u` | `SA_USER` | Yes | - | Service user to remove |
+| `--db` | `-d` | `SNOW_UTILS_DB` | Yes | - | Database containing policies |
+| `--pat-name` | - | `PAT_NAME` | No | `{USER}_PAT` | Name of the PAT to remove |
+| `--drop-user` | - | - | No | false | Also drop the service user |
+| `--pat-only` | - | - | No | false | Only remove PAT, keep policies |
+| `--admin-role` | `-a` | - | No | `accountadmin` | Admin role for removing resources |
+| `--env-path` | - | - | No | `.env` | .env file path |
+| `--yes` | - | - | No | - | Auto-confirm removal (Click confirmation_option) |
 
 #### rotate
 
@@ -1477,11 +1498,15 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 
 **Options:**
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `--user` | Yes | - | Service user with existing PAT |
-| `--role` | Yes | - | Role restriction for new PAT |
-| `--admin-role` | No | From manifest | Role for rotation |
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--user` | `-u` | `SA_USER` | Yes | - | Service user with existing PAT |
+| `--role` | `-r` | `SA_ROLE` | Yes | - | Role restriction for new PAT |
+| `--pat-name` | - | `PAT_NAME` | No | `{USER}_PAT` | Name for the PAT token |
+| `--admin-role` | `-a` | - | No | `accountadmin` | Admin role for rotation |
+| `--env-path` | - | - | No | `.env` | .env file path |
+| `--skip-verify` | - | - | No | false | Skip connection verification after rotation |
+| `--output` | `-o` | - | No | `text` | Output format: `text` or `json` |
 
 **After rotation:** Updates SA_PAT in .env with new token.
 
@@ -1496,11 +1521,12 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 
 **Options:**
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `--user` | Yes | - | Service user to verify |
-| `--role` | Yes | - | Role to test with |
-| `--debug` | No | false | Show detailed connection info |
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--user` | `-u` | `SA_USER` | Yes | - | Service user to verify |
+| `--role` | `-r` | `SA_ROLE` | Yes | - | Role to test with |
+| `--password` | `-p` | `SA_PAT` | No | - | PAT token (falls back to SA_PAT env var or .env file) |
+| `--env-path` | - | - | No | `.env` | .env file to read token from |
 
 **Verification runs:** `SELECT current_timestamp()` to confirm auth works.
 
