@@ -1141,27 +1141,103 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 - `policy delete` -- NOT "policy remove", "policy destroy"
 - `policy assign` -- NOT "policy attach", "policy apply", "policy set"
 
-**Rule Create Options:**
+**Global Options (BEFORE subcommand):**
 
-- `--name, -n`: Network rule name (required)
-- `--db`: Database for rule (required)
-- `--schema, -s`: Schema (default: NETWORKS)
-- `--mode, -m`: Rule mode (default: INGRESS)
-  - `INGRESS` - Control who can connect TO Snowflake
-  - `EGRESS` - Control what Snowflake can connect TO
-  - `INTERNAL_STAGE` - Internal stage access rules
-  - `POSTGRES_INGRESS` - PostgreSQL interface incoming
-  - `POSTGRES_EGRESS` - PostgreSQL interface outbound
-- `--type, -t`: Rule type (default depends on mode)
-  - `IPV4` - IP addresses/CIDRs (default for INGRESS modes)
-  - `HOST_PORT` - hostname:port targets (default for EGRESS modes)
-  - `AWSVPCEID` - AWS VPC Endpoint IDs
-- `--values`: Comma-separated values (CIDRs, hosts, or VPC IDs depending on type)
-- `--allow-local`: Include auto-detected local IP **(IPV4 type only)**
-- `--allow-gh, -G`: Include GitHub Actions IPs **(IPV4 type only)**
-- `--allow-google, -g`: Include Google IPs **(IPV4 type only)**
-- `--policy, -p`: Also create network policy
-- `--dry-run`: Preview SQL without executing
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--verbose` | `-v` | false | Enable verbose output |
+| `--debug` | `-d` | false | Enable debug output |
+
+### `rule create`
+
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--name` | `-n` | `NW_RULE_NAME` | Yes | - | Network rule name |
+| `--db` | - | `NW_RULE_DB` | Yes | - | Database for rule |
+| `--schema` | `-s` | `NW_RULE_SCHEMA` | No | `NETWORKS` | Schema for rule |
+| `--mode` | `-m` | - | No | `INGRESS` | Rule mode (see constraints below) |
+| `--type` | `-t` | - | No | auto | Rule type (see constraints below) |
+| `--values` | - | - | No | - | Comma-separated values (CIDRs, hosts, VPC IDs) |
+| `--allow-local/--no-local` | - | - | No | true | Include auto-detected local IP (IPV4 only) |
+| `--allow-gh` | `-G` | - | No | false | Include GitHub Actions IPs (IPV4 only) |
+| `--allow-google` | `-g` | - | No | false | Include Google IPs (IPV4 only) |
+| `--dry-run` | - | - | No | false | Preview SQL without executing |
+| `--force` | `-f` | - | No | false | Overwrite existing rule (CREATE OR REPLACE) |
+| `--policy` | `-p` | - | No | - | Also create/alter a network policy with this name |
+| `--policy-mode` | - | - | No | `create` | `create` or `alter` the policy |
+| `--output` | `-o` | - | No | `text` | Output format: `text` or `json` |
+
+### `rule update`
+
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--name` | `-n` | `NW_RULE_NAME` | Yes | - | Network rule name |
+| `--db` | - | `NW_RULE_DB` | Yes | - | Database name |
+| `--schema` | `-s` | `NW_RULE_SCHEMA` | No | `NETWORKS` | Schema name |
+| `--values` | - | - | No | - | Comma-separated values to replace existing |
+| `--allow-local/--no-local` | - | - | No | true | Include auto-detected local IP (IPV4 only) |
+| `--allow-gh` | `-G` | - | No | false | Include GitHub Actions IPs (IPV4 only) |
+| `--allow-google` | `-g` | - | No | false | Include Google IPs (IPV4 only) |
+| `--dry-run` | - | - | No | false | Preview SQL without executing |
+
+### `rule delete`
+
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--name` | `-n` | `NW_RULE_NAME` | Yes | - | Network rule name |
+| `--db` | - | `NW_RULE_DB` | Yes | - | Database name |
+| `--schema` | `-s` | `NW_RULE_SCHEMA` | No | `NETWORKS` | Schema name |
+| `--yes` | - | - | No | - | Auto-confirm deletion |
+
+### `rule list`
+
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--db` | - | `NW_RULE_DB` | Yes | - | Database name |
+| `--schema` | `-s` | `NW_RULE_SCHEMA` | No | `NETWORKS` | Schema name |
+| `--admin-role` | `-a` | - | No | `accountadmin` | Role for listing |
+
+### `policy create`
+
+| Option | Short | Required | Default | Description |
+|--------|-------|----------|---------|-------------|
+| `--name` | `-n` | Yes | - | Network policy name |
+| `--rules` | `-r` | Yes | - | Comma-separated FQN of allowed network rules |
+| `--dry-run` | - | No | false | Preview SQL without executing |
+| `--force` | `-f` | No | false | Overwrite existing policy (CREATE OR REPLACE) |
+| `--output` | `-o` | No | `text` | Output format: `text` or `json` |
+
+### `policy alter`
+
+| Option | Short | Required | Default | Description |
+|--------|-------|----------|---------|-------------|
+| `--name` | `-n` | Yes | - | Network policy name |
+| `--rules` | `-r` | Yes | - | Comma-separated FQN of allowed network rules |
+| `--dry-run` | - | No | false | Preview SQL without executing |
+| `--output` | `-o` | No | `text` | Output format: `text` or `json` |
+
+### `policy delete`
+
+| Option | Short | Required | Default | Description |
+|--------|-------|----------|---------|-------------|
+| `--name` | `-n` | Yes | - | Network policy name |
+| `--user` | `-u` | No | - | Also unset policy from this user first |
+| `--admin-role` | `-a` | No | `accountadmin` | Role for deleting |
+| `--yes` | - | No | - | Auto-confirm deletion |
+
+### `policy list`
+
+| Option | Short | Required | Default | Description |
+|--------|-------|----------|---------|-------------|
+| `--admin-role` | `-a` | No | `accountadmin` | Role for listing |
+
+### `policy assign`
+
+| Option | Short | Required | Default | Description |
+|--------|-------|----------|---------|-------------|
+| `--name` | `-n` | Yes | - | Network policy name |
+| `--user` | `-u` | Yes | - | User to assign policy to |
+| `--admin-role` | `-a` | No | `accountadmin` | Role for assigning |
 
 **⚠️ Mode-Type Constraints:**
 
