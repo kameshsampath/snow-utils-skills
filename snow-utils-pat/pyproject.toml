@@ -4,11 +4,8 @@ version = "0.1.0"
 description = "Cortex Code skill for creating Snowflake Programmatic Access Tokens"
 requires-python = ">=3.12"
 dependencies = [
-    "click>=8.0",
-    "python-dotenv>=1.0.0",
-    "requests>=2.28",
-    "snow-utils-common",
+    "snow-utils",
 ]
 
 [tool.uv.sources]
-snow-utils-common = { path = "../common", editable = true }
+snow-utils = { git = "https://github.com/kameshsampath/snow-utils" }
