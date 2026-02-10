@@ -397,14 +397,23 @@ uv run --project <SKILL_DIR> snow-utils-volumes \
 
 1. Read the full terminal output from the command
 2. Copy-paste the ENTIRE output into your response as a fenced code block
-3. The output includes AWS resource summary, Snowflake summary, IAM policy JSON, trust policy JSON, and CREATE EXTERNAL VOLUME SQL
+3. The output includes ALL of the following -- do NOT omit any section:
+   - **AWS resource summary** (S3 bucket, IAM role name, IAM policy name)
+   - **Snowflake resource summary** (external volume name)
+   - **Full IAM policy JSON** (the S3 access permissions document)
+   - **Full IAM trust policy JSON** (the Snowflake cross-account trust document)
+   - **Full Snowflake SQL** (CREATE EXTERNAL VOLUME statement)
 
 > **Note:** External volumes are account-level objects in Snowflake (no database/schema prefix).
+
+The IAM policy and trust policy JSONs are **critical** -- the user needs to review the exact
+permissions and trust relationships before approving resource creation.
 
 **❌ WRONG:** Just running the command and letting the terminal output speak for itself (it gets truncated).
 **❌ WRONG:** Constructing your own summary box or template instead of showing CLI output.
 **❌ WRONG:** Saying "see the output above" -- the user CANNOT see collapsed terminal output.
-**✅ RIGHT:** Pasting the full CLI output in your response.
+**❌ WRONG:** Pasting only the SQL but omitting the IAM policy / trust policy JSON.
+**✅ RIGHT:** Pasting the FULL CLI output in your response, including all JSON and SQL.
 
 > 🔄 **On pause/resume:** Re-run `--dry-run` and paste the complete output again before asking for confirmation.
 
@@ -873,7 +882,7 @@ snow-utils-volumes verify --volume-name MY_EXTERNAL_VOLUME
      create --bucket {BUCKET} --dry-run
    ```
 
-   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result into your response as a fenced code block so the user can see the resource summary AND all SQL/JSON statements.
+   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result into your response as a fenced code block -- including resource summaries, full IAM policy JSON, full trust policy JSON, and full CREATE EXTERNAL VOLUME SQL. Do NOT omit the JSON sections.
 
    Then ask:
 
