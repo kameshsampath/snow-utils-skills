@@ -676,6 +676,14 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 - `describe`: Show external volume properties
 - `update-trust`: Re-sync IAM trust policy
 
+**🔴 COMMAND NAMES (exact -- do NOT substitute):**
+
+- `create` -- NOT "setup", "make", "provision", "init"
+- `delete` -- NOT "remove", "destroy", "cleanup", "drop"
+- `verify` -- NOT "check", "test", "validate", "ping"
+- `describe` -- NOT "show", "get", "info", "status"
+- `update-trust` -- NOT "sync-trust", "refresh-trust"
+
 **Create Options:**
 
 - `--bucket`, `-b`: S3 bucket base name (required)
@@ -729,7 +737,8 @@ snow-utils-volumes --no-prefix create --bucket my-bucket
 ## Replay Flow (Minimal Approvals)
 
 > **🚨 GOAL:** Replay is for less technical users who trust the setup. Minimize friction.
-> Cortex Code constructs summary from manifest (no dry-run needed), gets ONE confirmation, then executes.
+> Cortex Code constructs summary from manifest, runs `--dry-run` to show full SQL/JSON preview, gets ONE confirmation, then executes.
+> **🔴 CRITICAL:** Even in replay flow, user MUST see the full SQL/JSON preview before confirmation. NEVER skip dry-run output.
 
 **Trigger phrases:** "replay manifest", "replay volumes", "recreate external volume", "replay from manifest"
 
@@ -852,40 +861,43 @@ snow-utils-volumes --no-prefix create --bucket my-bucket
    | **Rename** | Ask for new `EXTERNAL_VOLUME_NAME`. Update `.env` and proceed to step 6. |
    | **Cancel** | Stop replay. |
 
-6. **Extract values and display pre-populated summary:**
+6. **Run dry-run to show full SQL/JSON preview:**
 
-```
-ℹ️  Replay from manifest — values pre-populated (no questions to re-answer):
+   ```bash
+   uv run --project <SKILL_DIR> snow-utils-volumes \
+     --region {AWS_REGION} \
+     create --bucket {BUCKET} --dry-run
+   ```
 
-  Resources to create:
-    • S3 Bucket:        {PREFIX}-{BUCKET}
-    • IAM Policy:       {PREFIX}-{BUCKET}-snowflake-policy
-    • IAM Role:         {PREFIX}-{BUCKET}-snowflake-role
-    • External Volume:  {PREFIX}_{BUCKET}_EXTERNAL_VOLUME
+   **🔴 CRITICAL:** Display the FULL output of this command -- both the resource summary AND the SQL/JSON statements.
+   **DO NOT** construct your own summary box or skip the SQL/JSON. Run the command and show its complete output.
 
-  AWS Tags (applied to all AWS resources):
-    • managed-by:       snow-utils-volumes
-    • user:             {PREFIX_UPPER}
-    • project:          {BUCKET_UPPER}
-    • snowflake-volume: {PREFIX}_{BUCKET}_EXTERNAL_VOLUME
+   Then ask:
 
-  Configuration (from manifest):
-    Prefix:   {PREFIX}       (from manifest **Prefix:** field)
-    Bucket:   {BUCKET}       (from manifest **Bucket:** field)
-    Region:   {AWS_REGION}   (from manifest **Region:** field)
+   ```
+   Proceed with creation? [yes/no]
+   ```
 
-Proceed with creation? [yes/no]
-```
+   **⚠️ STOP**: Wait for user confirmation.
 
 7. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
 
-```bash
-uv run --project <SKILL_DIR> snow-utils-volumes \
-  --region {AWS_REGION} \
-  create --bucket {BUCKET} --output json
-```
+   ```bash
+   uv run --project <SKILL_DIR> snow-utils-volumes \
+     --region {AWS_REGION} \
+     create --bucket {BUCKET} --output json
+   ```
 
-8. **Update manifest Status** from `REMOVED` to `COMPLETE` after successful creation.
+8. **Verify (MANDATORY -- do NOT skip, even in replay):**
+
+   ```bash
+   uv run --project <SKILL_DIR> snow-utils-volumes \
+     verify --volume-name {EXTERNAL_VOLUME_NAME}
+   ```
+
+   > Wait for IAM propagation (up to 60s). If verify fails, retry once after 30s. If still fails, stop and present error.
+
+9. **Update manifest Status** from `REMOVED` to `COMPLETE` after successful creation and verification.
 
 ## Replay All Flow (Multi-Skill Sequential)
 

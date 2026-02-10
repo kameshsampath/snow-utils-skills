@@ -787,6 +787,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 **Trigger phrases:** "replay network", "replay network manifest", "recreate network", "replay from manifest"
 
 > **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (in current working directory)
+> **🔴 CRITICAL:** Even in replay flow, user MUST see the full SQL preview before confirmation. NEVER skip dry-run output.
 
 **IMPORTANT:** This is the **snow-utils-networks** skill. Only replay sections marked `<!-- START -- snow-utils-networks -->`. If manifest contains other skills (Volumes, PAT), ignore them - use the appropriate skill for those.
 
@@ -910,32 +911,38 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
    | **Rename** | Ask for new `NW_RULE_NAME`. Derive new policy name. Update `.env` and proceed to step 5. |
    | **Cancel** | Stop replay. |
 
-5. **Display pre-populated summary with single confirmation:**
+5. **Run dry-run to show full SQL preview:**
 
-```
+   ```bash
+   uv run --project <SKILL_DIR> snow-utils-networks \
+     rule create --name {NW_RULE_NAME} --db {NW_RULE_DB} \
+     [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs from manifest>] \
+     [--policy {NW_RULE_NAME}_POLICY] --dry-run
+   ```
 
-ℹ️  Replay from manifest — values pre-populated (no questions to re-answer):
+   **🔴 CRITICAL:** Display the FULL output of this command -- both the resource summary AND the SQL statements.
+   **DO NOT** construct your own summary box or skip the SQL. Run the command and show its complete output.
 
-  Resources to create:
-    1. Network Rule:   {NW_RULE_NAME}
-    2. Network Policy: {NW_RULE_NAME}_POLICY
+   Then ask:
 
-  Configuration (from manifest):
-    Rule Name:  {NW_RULE_NAME}     (from manifest **Rule Name:** field)
-    Database:   {NW_RULE_DB}       (from manifest **Database:** field)
+   ```
+   Proceed with creation? [yes/no]
+   ```
 
-  IP Sources (from manifest):
-    Local IP:       {LOCAL_IP}     (auto-detected on this machine)
-    GitHub Actions: {yes/no}       (from manifest IP Sources table)
-    Google Cloud:   {yes/no}       (from manifest IP Sources table)
-    Custom CIDRs:   {list}         (from manifest IP Sources table)
-
-Proceed with creation? [yes/no]
-
-```
+   **⚠️ STOP**: Wait for user confirmation.
 
 6. **On "yes":** Execute all creation steps without individual confirmations
-7. **Update manifest** status back to COMPLETE as each resource is created
+
+7. **Verify (MANDATORY -- do NOT skip, even in replay):**
+
+   ```bash
+   uv run --project <SKILL_DIR> snow-utils-networks \
+     rule list --db {NW_RULE_DB}
+   ```
+
+   > Confirm the network rule appears in the list. If verify fails, stop and present error.
+
+8. **Update manifest** status back to COMPLETE as each resource is created
 
 #### Resume Flow (Partial Creation Recovery)
 
@@ -1123,6 +1130,16 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 
 - `rule` - Manage network rules (create, update, list, delete)
 - `policy` - Manage network policies (create, alter, list, delete)
+
+**🔴 COMMAND NAMES (exact -- do NOT substitute):**
+
+- `rule create` -- NOT "rule setup", "rule make", "rule add"
+- `rule delete` -- NOT "rule remove", "rule destroy", "rule drop"
+- `rule update` -- NOT "rule modify", "rule change", "rule edit"
+- `rule list` -- NOT "rule show", "rule get", "rule describe"
+- `policy create` -- NOT "policy setup", "policy make"
+- `policy delete` -- NOT "policy remove", "policy destroy"
+- `policy assign` -- NOT "policy attach", "policy apply", "policy set"
 
 **Rule Create Options:**
 

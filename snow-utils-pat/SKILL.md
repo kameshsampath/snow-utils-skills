@@ -655,14 +655,20 @@ Proceed to Step 5c.
 
 > Step 4 already showed SQL and got user approval. Now updating .env with PAT.
 
-**Update .env with the PAT token (single-quoted for safe parsing):**
+**🔴 SECURITY: The CLI writes SA_PAT directly to `.env` via `--dot-env-file`.**
+**NEVER use `sed` or shell commands to write the token -- the raw value would leak in command text.**
+
+The `create` command with `--dot-env-file` handles `.env` update internally:
 
 ```bash
-# Use single quotes to handle special characters in PAT
-sed -i '' "s/^SA_PAT=.*/SA_PAT='<PAT_TOKEN_VALUE>'/" .env
+uv run --project <SKILL_DIR> snow-utils-pat \
+  --comment "{COMMENT_PREFIX}" create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
+  --default-expiry-days <DEFAULT_EXPIRY> --max-expiry-days <MAX_EXPIRY> \
+  --dot-env-file .env
 ```
 
-> Note: Diff hidden to protect sensitive value.
+> The CLI writes `SA_PAT`, `SA_USER`, and `SA_ROLE` to `.env` internally.
+> The raw token **never** appears in shell output or command text.
 
 **Set restrictive permissions:**
 
@@ -969,7 +975,8 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 #### Replay Flow (Minimal Approvals)
 
 > **🚨 GOAL:** Replay is for less technical users who trust the setup. Minimize friction.
-> Cortex Code constructs summary from manifest (no dry-run needed), gets ONE confirmation, then executes.
+> Cortex Code constructs summary from manifest, runs `--dry-run` to show full SQL preview, gets ONE confirmation, then executes.
+> **🔴 CRITICAL:** Even in replay flow, user MUST see the full SQL preview before confirmation. NEVER skip dry-run output.
 
 **Trigger phrases:** "replay pat", "replay pat manifest", "recreate pat", "replay from manifest"
 
@@ -1106,47 +1113,51 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
    | **Rename** | Ask for new `SA_USER` name. Derive new resource names per naming convention. Update `.env` and proceed to step 6. |
    | **Cancel** | Stop replay. |
 
-6. **Extract values and display pre-populated summary:**
+6. **Run dry-run to show full SQL preview:**
 
-```
-ℹ️  Replay from manifest — values pre-populated (no questions to re-answer):
+   ```bash
+   uv run --project <SKILL_DIR> snow-utils-pat \
+     --comment "{COMMENT_PREFIX}" create --user {SA_USER} --role {SA_ROLE} --db {SNOW_UTILS_DB} \
+     --default-expiry-days {DEFAULT_EXPIRY} --max-expiry-days {MAX_EXPIRY} --dry-run
+   ```
 
-  Resources to create:
-    • Network Rule:   {SA_USER}_NETWORK_RULE
-    • Network Policy: {SA_USER}_NETWORK_POLICY
-    • Auth Policy:    {SA_USER}_AUTH_POLICY
-    • Service User:   {SA_USER}
-    • PAT:            {SA_USER}_PAT
+   **🔴 CRITICAL:** Display the FULL output of this command -- both the resource summary AND the SQL statements.
+   **DO NOT** construct your own summary box or skip the SQL. Run the command and show its complete output.
 
-  Configuration (from manifest):
-    User:     {SA_USER}           (from manifest **User:** field)
-    Role:     {SA_ROLE}           (from manifest **Role:** field)
-    Database: {SNOW_UTILS_DB}     (from manifest **Database:** field)
-    Comment:  {COMMENT_PREFIX}    (from manifest **Comment:** field)
+   Then ask:
 
-  Expiry settings (from manifest):
-    Default Expiry: {DEFAULT_EXPIRY} days
-    Max Expiry:     {MAX_EXPIRY} days
-    Previous Expiry Date: {ACTUAL_EXPIRY}  (new expiry will be recalculated)
+   ```
+   Proceed with creation? [yes/no]
+   ```
 
-Proceed with creation? [yes/no]
-```
+   **⚠️ STOP**: Wait for user confirmation.
 
-7. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
+7. **On "yes":** Run actual command with `--dot-env-file` (ONE bash approval, NO further prompts):
 
-```bash
-uv run --project <SKILL_DIR> snow-utils-pat \
-  --comment "{COMMENT_PREFIX}" create --user {SA_USER} --role {SA_ROLE} --db {SNOW_UTILS_DB} \
-  --default-expiry-days {DEFAULT_EXPIRY} --max-expiry-days {MAX_EXPIRY}
-```
+   ```bash
+   uv run --project <SKILL_DIR> snow-utils-pat \
+     --comment "{COMMENT_PREFIX}" create --user {SA_USER} --role {SA_ROLE} --db {SNOW_UTILS_DB} \
+     --default-expiry-days {DEFAULT_EXPIRY} --max-expiry-days {MAX_EXPIRY} \
+     --dot-env-file .env
+   ```
 
-> **⚠️ CRITICAL:** ALWAYS include `--default-expiry-days` and `--max-expiry-days` using values from the manifest.
-> NEVER omit these flags or use alternative parameter names. If manifest values are missing, use `--default-expiry-days 90 --max-expiry-days 365`.
+   > **⚠️ CRITICAL:** ALWAYS include `--default-expiry-days` and `--max-expiry-days` using values from the manifest.
+   > NEVER omit these flags or use alternative parameter names. If manifest values are missing, use `--default-expiry-days 90 --max-expiry-days 365`.
+   > **🔴 SECURITY:** ALWAYS use `--dot-env-file .env` so the token is written internally. NEVER use `sed` or shell commands.
 
-- CLI shows progress for each step automatically
-- **NO additional user prompts until complete**
+   - CLI shows progress for each step automatically
+   - **NO additional user prompts until complete**
 
-8. **Update manifest** status back to `COMPLETE` after successful creation
+8. **Verify connection (MANDATORY -- do NOT skip, even in replay):**
+
+   ```bash
+   uv run --project <SKILL_DIR> snow-utils-pat \
+     verify --user {SA_USER} --role {SA_ROLE}
+   ```
+
+   > Reads SA_PAT from `.env` automatically. If verify fails, stop and present error.
+
+9. **Update manifest** status back to `COMPLETE` after successful creation and verification
 
 #### Resume Flow (Partial Creation Recovery)
 
@@ -1300,9 +1311,11 @@ Fix the PAT issue, then run "replay all" again to continue.
 **When updating .env programmatically:**
 
 ```bash
-# Use single quotes to handle special characters in PAT
-sed -i '' "s/^SA_PAT=.*/SA_PAT='<TOKEN>'/" .env
+# ALWAYS use --dot-env-file to write SA_PAT securely
+uv run --project <SKILL_DIR> snow-utils-pat \
+  create ... --dot-env-file .env
 
+# NEVER use sed/echo/shell to write the token -- it leaks in command text
 # NEVER echo/cat the .env file after adding PAT
 # NEVER use `git diff` that shows .env contents with PAT
 ```
@@ -1385,6 +1398,13 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 | `rotate` | Regenerate PAT token, keeps all policies intact |
 | `verify` | Test PAT connection using `snow sql -x` |
 
+**🔴 COMMAND NAMES (exact -- do NOT substitute):**
+
+- `create` -- NOT "setup", "make", "provision", "init"
+- `remove` -- NOT "delete", "destroy", "cleanup", "drop"
+- `rotate` -- NOT "refresh", "renew", "regenerate"
+- `verify` -- NOT "check", "test", "validate", "ping"
+
 #### create
 
 > **⚠️ ALWAYS include `--default-expiry-days` and `--max-expiry-days` explicitly.**
@@ -1425,6 +1445,7 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 | `--local-ip` | No | auto-detect | Override IP for network rule |
 | `--default-expiry-days` | No | 15 | PAT default expiry (Snowflake default) |
 | `--max-expiry-days` | No | 365 | PAT max expiry (Snowflake default) |
+| `--dot-env-file` | No | - | Write SA_PAT directly to this .env file (prevents token leaking in shell) |
 
 #### remove
 
