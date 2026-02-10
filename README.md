@@ -261,7 +261,7 @@ Shared by: ALICE | Your user: BOBS
   Service Role                ALICE_HIRC_DUCKDB_DEMO_ACCESS        → BOBS_HIRC_DUCKDB_DEMO_ACCESS
   Utils Database              ALICE_SNOW_UTILS                     → BOBS_SNOW_UTILS
   ─────────────────────────────────────────────────────────────────────────────────────
-  S3 Bucket                   my-iceberg-bucket                     (unchanged)
+  S3 Bucket                   iceberg-data                          (unchanged)
   Region                      us-west-2                             (unchanged)
 
 Options:

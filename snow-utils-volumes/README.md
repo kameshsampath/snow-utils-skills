@@ -25,7 +25,7 @@ cortex skill add https://github.com/kameshsampath/snow-utils-skills/snow-utils-v
 ```
 "Create an external volume for S3"
 "Set up Iceberg storage on S3"
-"Create external volume for my-bucket"
+"Create external volume for iceberg-data"
 "Set up external volume in us-west-2"
 ```
 

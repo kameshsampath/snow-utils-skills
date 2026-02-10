@@ -752,9 +752,9 @@ uv run --project <SKILL_DIR> check-setup
 
 ```bash
 snow-utils-volumes [GLOBAL OPTIONS] <command> [COMMAND OPTIONS]
-snow-utils-volumes --region us-west-2 create --bucket my-bucket --dry-run
-snow-utils-volumes --no-prefix create --bucket my-bucket
-snow-utils-volumes delete --bucket my-bucket --yes
+snow-utils-volumes --region us-west-2 create --bucket iceberg-data --dry-run
+snow-utils-volumes --no-prefix create --bucket iceberg-data
+snow-utils-volumes delete --bucket iceberg-data --yes
 snow-utils-volumes verify --volume-name MY_EXTERNAL_VOLUME
 ```
 
