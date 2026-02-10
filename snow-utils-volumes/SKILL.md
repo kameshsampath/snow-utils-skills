@@ -684,18 +684,76 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 - `describe` -- NOT "show", "get", "info", "status"
 - `update-trust` -- NOT "sync-trust", "refresh-trust"
 
-**Create Options:**
+**Global Options (BEFORE command):**
 
-- `--bucket`, `-b`: S3 bucket base name (required)
-- `--dry-run`: Preview without creating
-- `--output json`: Machine-readable output
+| Option | Short | Env Var | Default | Description |
+|--------|-------|---------|---------|-------------|
+| `--region` | `-r` | `AWS_REGION` | `us-west-2` | AWS region |
+| `--prefix` | `-p` | `EXTVOLUME_PREFIX` | current username | Prefix for AWS resources |
+| `--no-prefix` | - | - | false | Disable username prefix |
+| `--verbose` | `-v` | - | false | Enable verbose output |
+| `--debug` | - | - | false | Enable debug output (shows SQL) |
+| `--comment` | `-c` | - | auto | Comment for external volume |
+
+### `create`
+
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--bucket` | `-b` | `BUCKET` | Yes | - | S3 bucket base name (will be prefixed) |
+| `--role-name` | - | - | No | `{prefix}-{bucket}-snowflake-role` | IAM role name |
+| `--policy-name` | - | - | No | `{prefix}-{bucket}-snowflake-policy` | IAM policy name |
+| `--volume-name` | - | `EXTERNAL_VOLUME_NAME` | No | `{PREFIX}_{BUCKET}_EXTERNAL_VOLUME` | Snowflake external volume name |
+| `--storage-location-name` | - | - | No | `{prefix}-{bucket}-s3-{region}` | Storage location name |
+| `--external-id` | - | - | No | auto-generated | External ID for trust relationship |
+| `--no-writes` | - | - | No | false | Create read-only external volume |
+| `--skip-verify` | - | - | No | false | Skip external volume verification |
+| `--dry-run` | - | - | No | false | Preview what would be created |
+| `--force` | `-f` | - | No | false | Overwrite existing volume (CREATE OR REPLACE) |
+| `--output` | `-o` | - | No | `text` | Output format: `text` or `json` |
+
+### `delete`
+
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--bucket` | `-b` | `BUCKET` | Yes | - | S3 bucket base name |
+| `--role-name` | - | - | No | `{prefix}-{bucket}-snowflake-role` | IAM role name |
+| `--policy-name` | - | - | No | `{prefix}-{bucket}-snowflake-policy` | IAM policy name |
+| `--volume-name` | - | `EXTERNAL_VOLUME_NAME` | No | `{PREFIX}_{BUCKET}_EXTERNAL_VOLUME` | Snowflake volume name |
+| `--delete-bucket` | - | - | No | false | Also delete the S3 bucket |
+| `--force` | - | - | No | false | Force delete bucket even if not empty |
+| `--yes` | `-y` | - | No | false | Skip confirmation prompt |
+| `--output` | `-o` | - | No | `text` | Output format: `text` or `json` |
+
+### `verify`
+
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--volume-name` | `-v` | `EXTERNAL_VOLUME_NAME` | Yes | - | Snowflake external volume name |
+
+### `describe`
+
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--volume-name` | `-v` | `EXTERNAL_VOLUME_NAME` | Yes | - | Snowflake external volume name |
+
+### `update-trust`
+
+| Option | Short | Env Var | Required | Default | Description |
+|--------|-------|---------|----------|---------|-------------|
+| `--bucket` | `-b` | `BUCKET` | No | - | S3 bucket base name (to derive role/volume names) |
+| `--role-name` | `-r` | - | No | - | IAM role name to update |
+| `--volume-name` | `-v` | `EXTERNAL_VOLUME_NAME` | No | - | Snowflake external volume name |
+
+> At least `--bucket` or both `--role-name` and `--volume-name` must be provided.
 
 **Correct command structure:**
 
 ```bash
-snow-utils-volumes [GLOBAL OPTIONS] create [CREATE OPTIONS]
+snow-utils-volumes [GLOBAL OPTIONS] <command> [COMMAND OPTIONS]
 snow-utils-volumes --region us-west-2 create --bucket my-bucket --dry-run
 snow-utils-volumes --no-prefix create --bucket my-bucket
+snow-utils-volumes delete --bucket my-bucket --yes
+snow-utils-volumes verify --volume-name MY_EXTERNAL_VOLUME
 ```
 
 ## Stopping Points
