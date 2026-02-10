@@ -525,34 +525,20 @@ uv run --project <SKILL_DIR> snow-utils-networks \
   [--policy <POLICY_NAME>] --dry-run
 ```
 
-**🔴 CRITICAL: SHOW BOTH SUMMARY AND FULL SQL**
+**🔴 CRITICAL: Run the CLI dry-run and show its COMPLETE output to the user.**
 
-After running dry-run, display output in TWO parts:
+> **DO NOT** construct your own summary box, table, or SQL. The CLI generates both a
+> resource summary AND the full SQL preview. Run the command and display ALL of its output.
 
-**Part 1 - Resource Summary (brief):**
+The CLI `--dry-run` output includes:
+1. **Resource summary** (rule name, mode, type, CIDRs)
+2. **Full SQL** (CREATE NETWORK RULE, CREATE NETWORK POLICY)
 
-```
-Rule Name: MY_DB.NETWORKS.MY_RULE
-Mode:      INGRESS
-Type:      IPV4
-Values:    3 CIDRs
-```
+**You MUST present the ENTIRE CLI output to the user.** Do not truncate, summarize, or restyle it.
 
-**Part 2 - Full SQL (MANDATORY - do not skip on first display):**
-
-```sql
--- Uses admin_role from manifest (defaults to SECURITYADMIN)
-USE ROLE <ADMIN_ROLE>;
-CREATE NETWORK RULE MY_DB.NETWORKS.MYAPP_RUNNER_NETWORK_RULE
-    MODE = INGRESS
-    TYPE = IPV4
-    VALUE_LIST = ('192.168.1.1/32', '10.0.0.0/8', '172.16.0.0/12')
-    COMMENT = 'MYAPP network rule - managed by snow-utils-networks';
-
-CREATE NETWORK POLICY MYAPP_RUNNER_NETWORK_POLICY
-    ALLOWED_NETWORK_RULE_LIST = ('MY_DB.NETWORKS.MYAPP_RUNNER_NETWORK_RULE')
-    COMMENT = 'MYAPP network policy - managed by snow-utils-networks';
-```
+**❌ WRONG:** Constructing your own summary box or table and hiding the SQL.
+**❌ WRONG:** Showing only "45 more lines" collapsed output.
+**✅ RIGHT:** Displaying the full CLI dry-run output including all SQL statements.
 
 **COMMENT Pattern:** `{CONTEXT} {resource_type} - managed by snow-utils-networks`
 
@@ -562,13 +548,7 @@ CREATE NETWORK POLICY MYAPP_RUNNER_NETWORK_POLICY
 - Example: `MYAPP_RUNNER_NETWORK_RULE` → `MYAPP`
 - Can be overridden via root CLI option: `snow-utils-networks --comment "MY_PROJECT" rule create ...`
 
-This enables:
-
-- Easy identification of resources by project context
-- Filtering resources by skill: `SHOW NETWORK RULES WHERE COMMENT LIKE '%snow-utils-networks%'`
-- Cleanup discovery across multiple projects
-
-**FORBIDDEN:** Showing only summary without SQL. User MUST see BOTH parts on first display.
+> 🔄 **On pause/resume:** Re-run `--dry-run` and display the complete output again before asking for confirmation.
 
 **⚠️ STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 

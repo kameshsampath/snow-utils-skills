@@ -498,6 +498,11 @@ Then continue to Step 4.
 
 ### Step 4: Preview (Dry Run)
 
+**🔴 CRITICAL: Run the CLI dry-run and show its COMPLETE output to the user.**
+
+> **DO NOT** construct your own summary box, table, or SQL. The CLI generates both a
+> resource summary AND the full SQL preview. Run the command and display ALL of its output.
+
 **Execute:**
 
 ```bash
@@ -505,61 +510,17 @@ uv run --project <SKILL_DIR> snow-utils-pat \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --dry-run
 ```
 
-**🔴 CRITICAL: ALWAYS SHOW SUMMARY + FULL SQL**
+The CLI `--dry-run` output includes:
+1. **Resource summary** (user, role, database, PAT name, CIDRs)
+2. **Full SQL** for every step (CREATE USER, CREATE NETWORK RULE, CREATE AUTHENTICATION POLICY, ADD PAT)
 
-> This is MANDATORY on EVERY display - even after pause/resume, context restart, or re-confirmation.
-> **FORBIDDEN:** Showing only summary. User MUST see BOTH parts EVERY time.
+**You MUST present the ENTIRE CLI output to the user.** Do not truncate, summarize, or restyle it.
 
-**Template (ALWAYS use this exact structure):**
+**❌ WRONG:** Constructing your own summary box or table and hiding the SQL.
+**❌ WRONG:** Showing only "45 more lines" collapsed output.
+**✅ RIGHT:** Displaying the full CLI dry-run output including all SQL statements.
 
-**Part 1 - Resource Summary (brief):**
-
-```
-Resources to create:
-  User:              HIRC_DUCKDB_DEMO_RUNNER
-  Role:              HIRC_DUCKDB_DEMO_ACCESS
-  Network Rule:      KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE
-  Network Policy:    HIRC_DUCKDB_DEMO_RUNNER_NETWORK_POLICY
-  Auth Policy:       KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY
-  PAT Name:          HIRC_DUCKDB_DEMO_RUNNER_PAT
-```
-
-**Part 2 - Full SQL (MANDATORY - do not skip on first display):**
-
-```sql
--- Step 1: Create service user
--- Uses admin_role from manifest (defaults to ACCOUNTADMIN)
-USE ROLE <ADMIN_ROLE>;
-CREATE USER IF NOT EXISTS HIRC_DUCKDB_DEMO_RUNNER
-    TYPE = SERVICE
-    COMMENT = 'HIRC_DUCKDB_DEMO service account - managed by snow-utils-pat';
-GRANT ROLE HIRC_DUCKDB_DEMO_ACCESS TO USER HIRC_DUCKDB_DEMO_RUNNER;
-
--- Step 2: Create network rule and policy
-USE ROLE <ADMIN_ROLE>;
-CREATE NETWORK RULE KAMESHS_SNOW_UTILS.NETWORKS.HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE
-    MODE = INGRESS
-    TYPE = IPV4
-    VALUE_LIST = ('192.168.1.1/32')
-    COMMENT = 'HIRC_DUCKDB_DEMO network rule - managed by snow-utils-pat';
-
--- Step 3: Create authentication policy
-USE ROLE <ADMIN_ROLE>;
-CREATE SCHEMA IF NOT EXISTS KAMESHS_SNOW_UTILS.POLICIES;
-CREATE OR ALTER AUTHENTICATION POLICY KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY
-    AUTHENTICATION_METHODS = ('PROGRAMMATIC_ACCESS_TOKEN')
-    PAT_POLICY = (
-        DEFAULT_EXPIRY_IN_DAYS = 15
-        MAX_EXPIRY_IN_DAYS = 365
-        NETWORK_POLICY_EVALUATION = ENFORCED_REQUIRED
-    )
-    COMMENT = 'HIRC_DUCKDB_DEMO PAT auth policy - managed by snow-utils-pat';
-
-ALTER USER HIRC_DUCKDB_DEMO_RUNNER SET AUTHENTICATION POLICY KAMESHS_SNOW_UTILS.POLICIES.HIRC_DUCKDB_DEMO_RUNNER_AUTH_POLICY;
-
--- Step 4: Create PAT
-ALTER USER IF EXISTS HIRC_DUCKDB_DEMO_RUNNER ADD PAT HIRC_DUCKDB_DEMO_RUNNER_PAT ROLE_RESTRICTION = HIRC_DUCKDB_DEMO_ACCESS;
-```
+> 🔄 **On pause/resume:** Re-run `--dry-run` and display the complete output again before asking for confirmation.
 
 **COMMENT Pattern:** `{DEMO_CONTEXT} {resource_type} - managed by snow-utils-pat`
 
@@ -584,11 +545,6 @@ This enables:
 - Easy identification of resources by demo/project context
 - Filtering resources by skill: `SHOW USERS WHERE COMMENT LIKE '%snow-utils-pat%'`
 - Cleanup discovery across multiple demos
-
-**❌ WRONG:** Showing only summary table.
-**✅ RIGHT:** Summary table + Full SQL block together.
-
-> 🔄 **On pause/resume:** Re-display this SAME summary + SQL before asking for confirmation again.
 
 **STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 

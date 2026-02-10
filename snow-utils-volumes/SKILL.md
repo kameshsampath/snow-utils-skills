@@ -387,82 +387,28 @@ uv run --project <SKILL_DIR> snow-utils-volumes \
   create --bucket ${BUCKET} --dry-run
 ```
 
-**🔴 CRITICAL: SHOW BOTH SUMMARY AND FULL SQL/JSON**
+**🔴 CRITICAL: Run the CLI dry-run and show its COMPLETE output to the user.**
 
-After running dry-run, display output in TWO parts:
+> **DO NOT** construct your own summary box, table, SQL, or JSON. The CLI generates
+> a full preview including resource summary, IAM policy JSON, trust policy JSON,
+> and Snowflake SQL. Run the command and display ALL of its output.
 
-**Part 1 - Resource Summary (brief):**
-
-```
-AWS Resources:
-  S3 Bucket:        kameshs-hirc-demo
-  IAM Role ARN:     arn:aws:iam::<ACCOUNT_ID>:role/kameshs-hirc-demo-snowflake-role
-  IAM Policy ARN:   arn:aws:iam::<ACCOUNT_ID>:policy/kameshs-hirc-demo-snowflake-policy
-
-Snowflake Objects (account-level):
-  External Volume:  KAMESHS_HIRC_DEMO_EXTERNAL_VOLUME
-```
+The CLI `--dry-run` output includes:
+1. **AWS resource summary** (bucket, IAM role, IAM policy)
+2. **Snowflake resource summary** (external volume name)
+3. **Full IAM policy JSON** (S3 access permissions)
+4. **Full IAM trust policy JSON** (Snowflake cross-account trust)
+5. **Full Snowflake SQL** (CREATE EXTERNAL VOLUME)
 
 > **Note:** External volumes are account-level objects in Snowflake (no database/schema prefix).
 
-**Part 2 - Full SQL and JSON (MANDATORY - do not skip on first display):**
+**You MUST present the ENTIRE CLI output to the user.** Do not truncate, summarize, or restyle it.
 
-Show these in formatted code blocks:
+**❌ WRONG:** Constructing your own summary box or template and hiding the SQL/JSON.
+**❌ WRONG:** Showing only "45 more lines" collapsed output.
+**✅ RIGHT:** Displaying the full CLI dry-run output including all SQL and JSON.
 
-**IAM Policy JSON:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion", "s3:DeleteObject", "s3:DeleteObjectVersion"],
-      "Resource": "arn:aws:s3:::bucket-name/*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
-      "Resource": "arn:aws:s3:::bucket-name"
-    }
-  ]
-}
-```
-
-**IAM Trust Policy JSON:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"AWS": "<SNOWFLAKE_IAM_USER_ARN>"},
-      "Action": "sts:AssumeRole",
-      "Condition": {"StringEquals": {"sts:ExternalId": "..."}}
-    }
-  ]
-}
-```
-
-**Snowflake SQL:**
-
-```sql
-CREATE EXTERNAL VOLUME IF NOT EXISTS VOLUME_NAME
-    STORAGE_LOCATIONS = (
-        (
-            NAME = 'storage-location-name'
-            STORAGE_PROVIDER = 'S3'
-            STORAGE_BASE_URL = 's3://bucket/'
-            STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::...:role/...'
-            STORAGE_AWS_EXTERNAL_ID = '...'
-        )
-    )
-    ALLOW_WRITES = TRUE
-    COMMENT = 'Used by KAMESHS - DEMO app - managed by snow-utils-volumes';
-```
-
-**FORBIDDEN:** Showing only summary without SQL/JSON. User MUST see BOTH parts on first display.
+> 🔄 **On pause/resume:** Re-run `--dry-run` and display the complete output again before asking for confirmation.
 
 **⚠️ STOP**: Wait for explicit user approval ("yes", "ok", "proceed") before creating resources.
 
