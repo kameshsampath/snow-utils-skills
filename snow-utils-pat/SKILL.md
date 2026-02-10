@@ -18,7 +18,7 @@ Creates service users, network policies, authentication policies, and Programmat
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
 - **NEVER display PAT tokens in diffs, logs, or ANY output** - always mask as `***REDACTED***`
 - **NEVER show .env file contents after PAT is written** - use redacted placeholder
-- **NEVER run raw SQL for cleanup** - ALWAYS use `pat.py remove` command (handles dependency order automatically)
+- **NEVER run raw SQL for cleanup** - ALWAYS use `snow-utils-pat remove` command (handles dependency order automatically)
 - **NEVER create resources without showing SQL and getting confirmation first**
 - If .env values are empty, prompt user or run check_setup.py
 
@@ -55,7 +55,7 @@ When about to write/edit a sensitive value like `SA_PAT`:
 - **SA_ROLE** (`{PROJECT}_ACCESS`): Consumer-only role for PAT restriction. Apps/demos grant it access to their resources.
 - **SA_USER** (`{PROJECT}_RUNNER`): Service user with PAT, restricted to SA_ROLE
 
-**ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Python scripts (pat.py, network.py, extvolume.py) auto-load `.env` via `load_dotenv()`. For `snow sql` or other shell commands, use `set -a && source .env && set +a` before running.
+**ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. CLI tools (snow-utils-pat, snow-utils-networks, snow-utils-volumes) auto-load `.env` via `load_dotenv()`. For `snow sql` or other shell commands, use `set -a && source .env && set +a` before running.
 
 ### Step 0: Check Prerequisites (Manifest-Cached)
 
@@ -472,14 +472,14 @@ set -a && source .env && set +a && snow sql --role <ADMIN_ROLE> -q "SHOW USER PA
 
 | Option | Action |
 |--------|--------|
-| Rotate existing | Use `pat.py rotate` - regenerates token, keeps all policies intact |
-| Remove and recreate | Use `pat.py remove` then `pat.py create` - fresh start with new policies |
+| Rotate existing | Use `snow-utils-pat rotate` - regenerates token, keeps all policies intact |
+| Remove and recreate | Use `snow-utils-pat remove` then `snow-utils-pat create` - fresh start with new policies |
 | Cancel | Stop workflow |
 
 **If user chooses "Rotate existing":**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   rotate --user <SA_USER> --role <SA_ROLE>
 ```
 
@@ -488,7 +488,7 @@ Then skip to Step 6 (Verify Connection).
 **If user chooses "Remove and recreate":**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   remove --user <SA_USER> --db <SNOW_UTILS_DB> --yes
 ```
 
@@ -501,7 +501,7 @@ Then continue to Step 4.
 **Execute:**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> --dry-run
 ```
 
@@ -567,16 +567,16 @@ ALTER USER IF EXISTS HIRC_DUCKDB_DEMO_RUNNER ADD PAT HIRC_DUCKDB_DEMO_RUNNER_PAT
 
 - Derived from SA_USER by stripping suffixes: `_RUNNER`, `_SA`, `_SERVICE`, `_USER`
 - Example: `HIRC_DUCKDB_DEMO_RUNNER` → `HIRC_DUCKDB_DEMO`
-- Can be overridden via root CLI option: `pat.py --comment "MY_PROJECT" create ...`
+- Can be overridden via root CLI option: `snow-utils-pat --comment "MY_PROJECT" create ...`
 
 > **⚠️ CRITICAL:** `--comment` is a GLOBAL option - it MUST come BEFORE the subcommand!
 >
 > ```bash
 > # ✅ CORRECT - global option before subcommand
-> pat.py --comment "MY_PROJECT" create --user ${SA_USER} ...
+> snow-utils-pat --comment "MY_PROJECT" create --user ${SA_USER} ...
 > 
 > # ❌ WRONG - will fail with "No such option"
-> pat.py create --user ${SA_USER} --comment "MY_PROJECT" ...
+> snow-utils-pat create --user ${SA_USER} --comment "MY_PROJECT" ...
 > ```
 
 This enables:
@@ -599,7 +599,7 @@ This enables:
 **Execute:**
 
 ```bash
-uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
+uv run --project <SKILL_DIR> snow-utils-networks \
   rule create --name <SA_USER>_NETWORK_RULE --db <SNOW_UTILS_DB> --schema NETWORKS \
   --policy <SA_USER>_NETWORK_POLICY --output json
 ```
@@ -622,7 +622,7 @@ Proceed to Step 5b.
 **Execute:**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
   --default-expiry-days <DEFAULT_EXPIRY> --max-expiry-days <MAX_EXPIRY> \
   --skip-network --output json
@@ -638,12 +638,12 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 - DONE: Auth policy created
 - DONE: PAT created
 
-> **Note:** `--skip-network` tells pat.py that network resources were created in Step 5a.
+> **Note:** `--skip-network` tells snow-utils-pat that network resources were created in Step 5a.
 
 **Assign network policy to user** (now that user exists):
 
 ```bash
-uv run --project <SKILL_DIR>/../snow-utils-networks python <SKILL_DIR>/../snow-utils-networks/scripts/network.py \
+uv run --project <SKILL_DIR> snow-utils-networks \
   policy assign --name <SA_USER>_NETWORK_POLICY --user <SA_USER>
 ```
 
@@ -719,7 +719,7 @@ This manifest records all Snowflake resources created by snow-utils skills.
 Run this command to remove all resources:
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   remove --user {SA_USER} --db {SNOW_UTILS_DB}
 ```
 <!-- END -- snow-utils-pat -->
@@ -730,7 +730,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 **Always verify the PAT works after creation:**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   verify --user <SA_USER> --role <SA_ROLE>
 ```
 
@@ -842,7 +842,7 @@ This enables recovery if Cortex Code loses context mid-creation.
 #### CLI Cleanup (REQUIRED)
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user {SA_USER} --db {SNOW_UTILS_DB} --drop-user
+uv run --project <SKILL_DIR> snow-utils-pat remove --user {SA_USER} --db {SNOW_UTILS_DB} --drop-user
 ```
 
 #### SQL Reference (FALLBACK ONLY - if CLI unavailable)
@@ -922,7 +922,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
    #### CLI Cleanup (REQUIRED)
    
    ```bash
-   uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py remove --user KAMESHS_PAT_DEMO_RUNNER --db KAMESHS_SNOW_UTILS --drop-user
+   uv run --project <SKILL_DIR> snow-utils-pat remove --user KAMESHS_PAT_DEMO_RUNNER --db KAMESHS_SNOW_UTILS --drop-user
    ```
 
    ```
@@ -1135,7 +1135,7 @@ Proceed with creation? [yes/no]
 7. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   --comment "{COMMENT_PREFIX}" create --user {SA_USER} --role {SA_ROLE} --db {SNOW_UTILS_DB} \
   --default-expiry-days {DEFAULT_EXPIRY} --max-expiry-days {MAX_EXPIRY}
 ```
@@ -1310,11 +1310,11 @@ sed -i '' "s/^SA_PAT=.*/SA_PAT='<TOKEN>'/" .env
 **If you accidentally display a PAT:**
 
 1. Immediately inform the user
-2. Recommend rotating the PAT: `pat.py rotate --user <SA_USER> --role <SA_ROLE>`
+2. Recommend rotating the PAT: `snow-utils-pat rotate --user <SA_USER> --role <SA_ROLE>`
 
 ## Tools
 
-### check_setup.py (from common)
+### check_setup.py (from snow-utils-common)
 
 **Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
 
@@ -1330,7 +1330,7 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 
 - `--quiet`, `-q`: Exit 0 if ready, 1 if not (scripting only)
 
-### pat.py
+### snow-utils-pat CLI
 
 **Description:** Creates and manages Snowflake PATs with network and auth policies.
 
@@ -1391,7 +1391,7 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 > These are the exact CLI parameter names. NEVER substitute (e.g., `--expiry`, `--validity-days`, `--pat-expiry`).
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
   --default-expiry-days <DEFAULT_EXPIRY> --max-expiry-days <MAX_EXPIRY> --output json
 ```
@@ -1399,7 +1399,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 **Example with Snowflake defaults (15/365):**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
   --default-expiry-days 15 --max-expiry-days 365 --output json
 ```
@@ -1407,7 +1407,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 **Example with custom expiry (7/30):**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
   --default-expiry-days 7 --max-expiry-days 30 --output json
 ```
@@ -1432,7 +1432,7 @@ Removes all PAT-related resources in correct dependency order:
 PAT → Auth Policy (unset) → User → Auth Policy (drop) → Network Policy → Network Rule
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   remove --user <SA_USER> --db <SNOW_UTILS_DB>
 ```
 
@@ -1450,7 +1450,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 Regenerates PAT token while keeping all existing policies intact.
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   rotate --user <SA_USER> --role <SA_ROLE>
 ```
 
@@ -1469,7 +1469,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 Tests PAT authentication using `snow sql -x` (external/passwordless auth).
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
+uv run --project <SKILL_DIR> snow-utils-pat \
   verify --user <SA_USER> --role <SA_ROLE>
 ```
 
@@ -1511,9 +1511,9 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/pat.py \
 
 **Connection verification failed:** Check network policy allows your IP.
 
-**Cannot drop database (policy attached):** Run `pat.py remove --drop-user` - it handles dependency order automatically. **NEVER run raw SQL for cleanup.**
+**Cannot drop database (policy attached):** Run `snow-utils-pat remove --drop-user` - it handles dependency order automatically. **NEVER run raw SQL for cleanup.**
 
-**Cannot drop network rule (associated with policies):** Run `pat.py remove` - it detaches rules from policies before dropping. **NEVER run raw SQL for cleanup.**
+**Cannot drop network rule (associated with policies):** Run `snow-utils-pat remove` - it detaches rules from policies before dropping. **NEVER run raw SQL for cleanup.**
 
 ## Security Notes
 

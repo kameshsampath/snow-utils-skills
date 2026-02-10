@@ -29,7 +29,7 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
-**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Python scripts (network.py) auto-load `.env` via `load_dotenv()`. For `snow sql` or other shell commands, use `set -a && source .env && set +a` before running.
+**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. CLI tools (snow-utils-networks) auto-load `.env` via `load_dotenv()`. For `snow sql` or other shell commands, use `set -a && source .env && set +a` before running.
 
 ### Step 0: Check Prerequisites (Manifest-Cached)
 
@@ -470,8 +470,8 @@ set -a && source .env && set +a && snow sql -q "DESC NETWORK RULE <NW_RULE_DB>.<
 
 | Option | Action |
 |--------|--------|
-| Update existing | Use `network.py rule update` - modifies IPs, keeps policy intact |
-| Remove and recreate | Use `network.py rule delete` then `rule create` - fresh start |
+| Update existing | Use `snow-utils-networks rule update` - modifies IPs, keeps policy intact |
+| Remove and recreate | Use `snow-utils-networks rule delete` then `rule create` - fresh start |
 | Cancel | Stop workflow |
 
 **If user chooses "Update existing":**
@@ -498,7 +498,7 @@ Which IP sources should be allowed access?
 Then execute with converted flags:
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> snow-utils-networks \
   rule update --name <NW_RULE_NAME> --db <NW_RULE_DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>]
 ```
@@ -508,7 +508,7 @@ Then skip to Step 6 (Verify).
 **If user chooses "Remove and recreate":**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> snow-utils-networks \
   rule delete --name <NW_RULE_NAME> --db <NW_RULE_DB> --yes
 ```
 
@@ -519,7 +519,7 @@ Then continue to Step 4.
 **Execute:**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> snow-utils-networks \
   rule create --name <NW_RULE_NAME> --db <NW_RULE_DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
   [--policy <POLICY_NAME>] --dry-run
@@ -560,7 +560,7 @@ CREATE NETWORK POLICY MYAPP_RUNNER_NETWORK_POLICY
 
 - Derived from NW_RULE_NAME by stripping suffixes: `_NETWORK_RULE`, `_RULE`, `_RUNNER`
 - Example: `MYAPP_RUNNER_NETWORK_RULE` → `MYAPP`
-- Can be overridden via root CLI option: `network.py --comment "MY_PROJECT" rule create ...`
+- Can be overridden via root CLI option: `snow-utils-networks --comment "MY_PROJECT" rule create ...`
 
 This enables:
 
@@ -577,7 +577,7 @@ This enables:
 **Execute (use --output json to skip CLI confirmation - Cortex Code handles it):**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> snow-utils-networks \
   rule create --name <NW_RULE_NAME> --db <NW_RULE_DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
   [--policy <POLICY_NAME>] --output json
@@ -593,7 +593,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
 ### Step 6: Verify
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py \
+uv run --project <SKILL_DIR> snow-utils-networks \
   rule list --db <NW_RULE_DB>
 ```
 
@@ -691,7 +691,7 @@ Cortex Code can use this manifest to replay creation or cleanup resources.
 #### CLI Cleanup (REQUIRED)
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/network.py rule delete --name {NW_RULE_NAME} --db {NW_RULE_DB} --yes
+uv run --project <SKILL_DIR> snow-utils-networks rule delete --name {NW_RULE_NAME} --db {NW_RULE_DB} --yes
 ```
 
 #### SQL Reference (FALLBACK ONLY - if CLI unavailable)
@@ -1059,7 +1059,7 @@ Fix the PAT issue, then run "replay all" again to continue.
 
 ## Tools
 
-### check_setup.py (from common)
+### check_setup.py (from snow-utils-common)
 
 **Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
 
@@ -1075,7 +1075,7 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 
 - `--quiet`, `-q`: Exit 0 if ready, 1 if not (scripting only)
 
-### network.py
+### snow-utils-networks CLI
 
 **Description:** Creates and manages Snowflake network rules and policies.
 

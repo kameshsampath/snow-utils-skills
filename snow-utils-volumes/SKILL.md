@@ -43,7 +43,7 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud stor
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
 
-**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. Python scripts (extvolume.py) auto-load `.env` via `load_dotenv()`. For `snow sql` or other shell commands, use `set -a && source .env && set +a` before running.
+**⚠️ ENVIRONMENT REQUIREMENT:** Once SNOWFLAKE_DEFAULT_CONNECTION_NAME is set in .env, ALL commands must use it. CLI tools (snow-utils-volumes) auto-load `.env` via `load_dotenv()`. For `snow sql` or other shell commands, use `set -a && source .env && set +a` before running.
 
 ### Step 0: Check Prerequisites (Manifest-Cached)
 
@@ -374,7 +374,7 @@ Resources will be:
 **Execute (with prefix):**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> snow-utils-volumes \
   --region ${AWS_REGION} \
   create --bucket ${BUCKET} --dry-run
 ```
@@ -382,7 +382,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 **Execute (without prefix):**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> snow-utils-volumes \
   --region ${AWS_REGION} --no-prefix \
   create --bucket ${BUCKET} --dry-run
 ```
@@ -471,7 +471,7 @@ CREATE EXTERNAL VOLUME IF NOT EXISTS VOLUME_NAME
 **Execute (with prefix):**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> snow-utils-volumes \
   --region ${AWS_REGION} \
   create --bucket ${BUCKET} --output json
 ```
@@ -479,7 +479,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 **Execute (without prefix):**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> snow-utils-volumes \
   --region ${AWS_REGION} --no-prefix \
   create --bucket ${BUCKET} --output json
 ```
@@ -514,7 +514,7 @@ sleep 15
 **Execute:**
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> snow-utils-volumes \
   verify --volume-name ${EXTERNAL_VOLUME_NAME}
 ```
 
@@ -575,7 +575,7 @@ This manifest records all Snowflake resources created by snow-utils skills.
 Run this command to remove all resources:
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> snow-utils-volumes \
   --region ${AWS_REGION} \
   delete --bucket ${BUCKET} --yes --output json
 ```
@@ -583,7 +583,7 @@ uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
 With S3 bucket deletion:
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> snow-utils-volumes \
   --region ${AWS_REGION} \
   delete --bucket ${BUCKET} --delete-bucket --force --yes --output json
 ```
@@ -641,7 +641,7 @@ CREATE OR REPLACE ICEBERG TABLE my_table (
 
 ## Tools
 
-### check_setup.py (from common)
+### check_setup.py (from snow-utils-common)
 
 **Description:** Pre-flight check for snow-utils infrastructure. Prompts interactively.
 
@@ -657,7 +657,7 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 
 - `--quiet`, `-q`: Exit 0 if ready, 1 if not (scripting only)
 
-### extvolume.py
+### snow-utils-volumes CLI
 
 **Description:** Creates and manages Snowflake external volumes with S3 backend.
 
@@ -685,9 +685,9 @@ uv run --project <SKILL_DIR>/../common python -m snow_utils_common.check_setup
 **Correct command structure:**
 
 ```bash
-extvolume.py [GLOBAL OPTIONS] create [CREATE OPTIONS]
-extvolume.py --region us-west-2 create --bucket my-bucket --dry-run
-extvolume.py --no-prefix create --bucket my-bucket
+snow-utils-volumes [GLOBAL OPTIONS] create [CREATE OPTIONS]
+snow-utils-volumes --region us-west-2 create --bucket my-bucket --dry-run
+snow-utils-volumes --no-prefix create --bucket my-bucket
 ```
 
 ## Stopping Points
@@ -880,7 +880,7 @@ Proceed with creation? [yes/no]
 7. **On "yes":** Run actual command (ONE bash approval, NO further prompts):
 
 ```bash
-uv run --project <SKILL_DIR> python <SKILL_DIR>/scripts/extvolume.py \
+uv run --project <SKILL_DIR> snow-utils-volumes \
   --region {AWS_REGION} \
   create --bucket {BUCKET} --output json
 ```
