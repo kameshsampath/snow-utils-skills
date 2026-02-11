@@ -13,7 +13,8 @@ Creates service users, network policies, authentication policies, and Programmat
 
 - NEVER run SQL queries to discover/find/check values (no SHOW ROLES, SHOW DATABASES, SHOW USERS)
 - NEVER auto-populate empty .env values by querying Snowflake
-- NEVER use flags that bypass user interaction: `--yes`, `-y`, `--auto-setup`, `--auto-approve`, `--quiet`, `--force`, `--non-interactive`
+- NEVER use flags that bypass user interaction: `--auto-setup`, `--auto-approve`, `--quiet`, `--non-interactive`
+- **`--yes` / `-y` is REQUIRED** when executing commands after user has approved the dry-run (CLIs prompt interactively which does not work in Cortex Code's non-interactive shell)
 - NEVER assume user consent - always ask and wait for explicit confirmation
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
 - **NEVER display PAT tokens in diffs, logs, or ANY output** - always mask as `***REDACTED***`
@@ -626,10 +627,12 @@ Proceed to Step 5b.
 uv run --project <SKILL_DIR> snow-utils-pat \
   create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
   --default-expiry-days <DEFAULT_EXPIRY> --max-expiry-days <MAX_EXPIRY> \
-  --skip-network --output json
+  --skip-network --output json --yes
 ```
 
-> **⚠️ CRITICAL:** ALWAYS include `--default-expiry-days` and `--max-expiry-days` with the exact values from Step 3.
+> **⚠️ CRITICAL:** ALWAYS include `--yes` (the CLI prompts interactively which does not work in Cortex Code).
+> **Fallback:** If `--yes` is not available ("No such option"), use `--output json` instead (JSON mode skips confirmation), or pipe: `echo y | <command>`.
+> ALWAYS include `--default-expiry-days` and `--max-expiry-days` with the exact values from Step 3.
 > Cortex Code MUST NOT omit these flags or substitute different parameter names (e.g., `--expiry`, `--validity-days`).
 > The CLI defaults (15/365) only apply if the user explicitly chose the "Default" profile.
 
@@ -664,10 +667,12 @@ First, run `snow-utils-pat create --help` to confirm which options are available
 uv run --project <SKILL_DIR> snow-utils-pat \
   --comment "{COMMENT_PREFIX}" create --user <SA_USER> --role <SA_ROLE> --db <SNOW_UTILS_DB> \
   --default-expiry-days <DEFAULT_EXPIRY> --max-expiry-days <MAX_EXPIRY> \
-  --dot-env-file .env
+  --dot-env-file .env --yes
 ```
 
-> **Fallback:** If `--dot-env-file` is not available (command fails with "No such option"), drop that flag. The CLI still writes SA_PAT to `.env` via `--env-path` (default `.env`). Run `uv lock --upgrade-package snow-utils` to pick up the latest version that includes `--dot-env-file`.
+> **⚠️ CRITICAL:** ALWAYS include `--yes` (the CLI prompts interactively which does not work in Cortex Code).
+> **Fallback for `--yes`:** If not available ("No such option"), pipe: `echo y | <command>`.
+> **Fallback for `--dot-env-file`:** If not available, drop that flag. The CLI still writes SA_PAT to `.env` via `--env-path` (default `.env`). Run `uv lock --upgrade-package snow-utils` to pick up the latest version.
 
 > The CLI writes `SA_PAT`, `SA_USER`, and `SA_ROLE` to `.env` internally.
 > The raw token **never** appears in shell output or command text.
@@ -1199,13 +1204,15 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
    uv run --project <SKILL_DIR> snow-utils-pat \
      --comment "{COMMENT_PREFIX}" create --user {SA_USER} --role {SA_ROLE} --db {SNOW_UTILS_DB} \
      --default-expiry-days {DEFAULT_EXPIRY} --max-expiry-days {MAX_EXPIRY} \
-     --dot-env-file .env
+     --dot-env-file .env --yes
    ```
 
-   > **⚠️ CRITICAL:** ALWAYS include `--default-expiry-days` and `--max-expiry-days` using values from the manifest.
+   > **⚠️ CRITICAL:** ALWAYS include `--yes` (the CLI prompts interactively which does not work in Cortex Code).
+   > **Fallback for `--yes`:** If not available ("No such option"), pipe: `echo y | <command>`.
+   > ALWAYS include `--default-expiry-days` and `--max-expiry-days` using values from the manifest.
    > NEVER omit these flags or use alternative parameter names. If manifest values are missing, use `--default-expiry-days 90 --max-expiry-days 365`.
    > **🔴 SECURITY:** NEVER use `sed` or shell commands to write the token.
-   > **Fallback:** If `--dot-env-file` is not available ("No such option"), drop that flag -- the CLI writes SA_PAT to `.env` via `--env-path` anyway.
+   > **Fallback for `--dot-env-file`:** If not available, drop that flag -- the CLI writes SA_PAT to `.env` via `--env-path` anyway.
 
    - CLI shows progress for each step automatically
    - **NO additional user prompts until complete**
@@ -1537,6 +1544,7 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 | `--output` | `-o` | - | No | `text` | Output format: `text` or `json` |
 | `--skip-network` | - | - | No | false | Skip network rule/policy creation (when delegating to snow-utils-networks) |
 | `--dot-env-file` | - | - | No | - | Write SA_PAT directly to this .env file (prevents token leaking in shell) |
+| `--yes` | `-y` | - | No | false | Skip interactive confirmation (REQUIRED for Cortex Code automation) |
 
 #### remove
 

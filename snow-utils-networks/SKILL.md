@@ -23,7 +23,8 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 - NEVER run SQL queries to discover/find/check values (no SHOW ROLES, SHOW DATABASES, SHOW NETWORK RULES)
 - NEVER auto-populate empty .env values by querying Snowflake
-- NEVER use flags that bypass user interaction: `--yes`, `-y`, `--auto-setup`, `--auto-approve`, `--quiet`, `--force`, `--non-interactive`
+- NEVER use flags that bypass user interaction: `--auto-setup`, `--auto-approve`, `--quiet`, `--non-interactive`
+- **`--yes` / `-y` is REQUIRED** when executing commands after user has approved the dry-run (CLIs prompt interactively which does not work in Cortex Code's non-interactive shell)
 - NEVER assume user consent - always ask and wait for explicit confirmation
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
 - **NEVER run raw SQL for cleanup** - ALWAYS use CLI commands (handles dependency order and detach/reattach)
@@ -601,14 +602,16 @@ Proceed with creating these resources? [yes/no]
 
 ### Step 5: Create Resources
 
-**Execute (use --output json to skip CLI confirmation - Cortex Code handles it):**
+**Execute (ALWAYS include `--yes` -- the CLI prompts interactively which does not work in Cortex Code):**
 
 ```bash
 uv run --project <SKILL_DIR> snow-utils-networks \
   rule create --name <NW_RULE_NAME> --db <NW_RULE_DB> \
   [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs>] \
-  [--policy <POLICY_NAME>] --output json
+  [--policy <POLICY_NAME>] --output json --yes
 ```
+
+> **Fallback for `--yes`:** If not available ("No such option"), pipe: `echo y | <command>`.
 
 **On success:**
 
@@ -1015,7 +1018,14 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
    **⚠️ STOP**: Wait for user confirmation.
 
-6. **On "yes":** Execute all creation steps without individual confirmations
+6. **On "yes":** Execute with `--yes` (ALWAYS include -- CLIs prompt interactively which does not work in Cortex Code):
+
+   ```bash
+   uv run --project <SKILL_DIR> snow-utils-networks \
+     rule create --name {NW_RULE_NAME} --db {NW_RULE_DB} \
+     [--allow-local] [--allow-gh] [--allow-google] [--values <CIDRs from manifest>] \
+     [--policy {NW_RULE_NAME}_POLICY] --output json --yes
+   ```
 
 7. **Verify (MANDATORY -- do NOT skip, even in replay):**
 
@@ -1258,6 +1268,7 @@ uv run --project <SKILL_DIR> check-setup
 | `--policy` | `-p` | - | No | - | Also create/alter a network policy with this name |
 | `--policy-mode` | - | - | No | `create` | `create` or `alter` the policy |
 | `--output` | `-o` | - | No | `text` | Output format: `text` or `json` |
+| `--yes` | `-y` | - | No | false | Skip interactive confirmation (REQUIRED for Cortex Code automation) |
 
 ### `rule update`
 
@@ -1298,6 +1309,7 @@ uv run --project <SKILL_DIR> check-setup
 | `--dry-run` | - | No | false | Preview SQL without executing |
 | `--force` | `-f` | No | false | Overwrite existing policy (CREATE OR REPLACE) |
 | `--output` | `-o` | No | `text` | Output format: `text` or `json` |
+| `--yes` | `-y` | No | false | Skip interactive confirmation (REQUIRED for Cortex Code automation) |
 
 ### `policy alter`
 
@@ -1307,6 +1319,7 @@ uv run --project <SKILL_DIR> check-setup
 | `--rules` | `-r` | Yes | - | Comma-separated FQN of allowed network rules |
 | `--dry-run` | - | No | false | Preview SQL without executing |
 | `--output` | `-o` | No | `text` | Output format: `text` or `json` |
+| `--yes` | `-y` | No | false | Skip interactive confirmation (REQUIRED for Cortex Code automation) |
 
 ### `policy delete`
 
