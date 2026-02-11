@@ -13,6 +13,8 @@ Creates and manages network rules and policies for IP-based access control in Sn
 
 **📍 MANIFEST FILE:** `.snow-utils/snow-utils-manifest.md` (ALWAYS this exact path and filename - never search for other patterns like *.yaml or *.*)
 
+> **⛔ DO NOT hand-edit manifests.** Manifests are machine-managed by Cortex Code. Manual edits can corrupt the format and break replay, cleanup, and export flows. Use skill commands to modify resources instead.
+
 **⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) for all object creation. Uses admin_role from manifest (defaults to ACCOUNTADMIN) for privileged operations.
 
 **🔄 IDEMPOTENCY NOTE:** Network rules use `CREATE OR REPLACE` (Snowflake does not support `IF NOT EXISTS` for network rules). Network policies use `CREATE IF NOT EXISTS` to preserve existing policies. Re-running create operations is safe for automation.
@@ -534,13 +536,55 @@ uv run --project <SKILL_DIR> snow-utils-networks \
 **After the command completes, you MUST:**
 
 1. Read the full terminal output from the command
-2. Copy-paste the ENTIRE output into your response as a fenced code block
+2. Copy-paste the ENTIRE output into your response using **language-tagged** markdown code blocks
 3. The output includes both a resource summary AND full SQL (CREATE NETWORK RULE, CREATE NETWORK POLICY)
+
+**Formatting rules:**
+
+- Use ` ```text ` for the resource summary section
+- Use ` ```sql ` for the SQL statements section
+- Split the output into labeled sections for readability
 
 **❌ WRONG:** Just running the command and letting the terminal output speak for itself (it gets truncated).
 **❌ WRONG:** Constructing your own summary box or table instead of showing CLI output.
 **❌ WRONG:** Saying "see the output above" -- the user CANNOT see collapsed terminal output.
-**✅ RIGHT:** Pasting the full CLI output in your response.
+**❌ WRONG:** Pasting everything into one bare ` ``` ` block without language tags.
+**✅ RIGHT:** Pasting the CLI output with proper formatting like this:
+
+````
+Here is the dry-run preview:
+
+**Resource Summary:**
+
+```text
+==================================================
+Snowflake Network Manager
+  [DRY RUN]
+==================================================
+Rule Name: BOBS_HIRC_DUCKDB_DEMO_RUNNER_NETWORK_RULE
+Database:  BOBS_SNOW_UTILS
+Mode:      INGRESS
+Type:      IPV4
+CIDRs:     106.222.203.139/32, 0.0.0.0/0 (GitHub Actions)
+...
+```
+
+**SQL that would be executed:**
+
+```sql
+-- Step 1: Create network rule
+USE ROLE ACCOUNTADMIN;
+CREATE OR REPLACE NETWORK RULE BOBS_SNOW_UTILS.PUBLIC.BOBS_..._NETWORK_RULE
+  MODE = INGRESS TYPE = IPV4
+  VALUE_LIST = ('106.222.203.139/32', '0.0.0.0/0');
+
+-- Step 2: Create network policy
+CREATE NETWORK POLICY IF NOT EXISTS BOBS_..._NETWORK_POLICY
+  ALLOWED_NETWORK_RULE_LIST = ('BOBS_SNOW_UTILS.PUBLIC.BOBS_..._NETWORK_RULE');
+```
+
+Proceed with creating these resources? [yes/no]
+````
 
 **COMMENT Pattern:** `{CONTEXT} {resource_type} - managed by snow-utils-networks`
 
@@ -775,13 +819,62 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
 **If user asks to replay/recreate from manifest:**
 
-1. **Read manifest from current project directory:**
+1. **Detect manifest(s) in current directory:**
 
    ```bash
-   cat .snow-utils/snow-utils-manifest.md
+   WORKING_MANIFEST=""
+   SHARED_MANIFEST=""
+   SHARED_MANIFEST_FILE=""
+
+   [ -f .snow-utils/snow-utils-manifest.md ] && WORKING_MANIFEST="EXISTS" && \
+     WORKING_STATUS=$(grep "^Status:" .snow-utils/snow-utils-manifest.md | head -1 | awk '{print $2}') && \
+     echo "Working manifest: Status=${WORKING_STATUS}"
+
+   for f in *-manifest.md; do
+     [ -f "$f" ] && grep -q "## shared_info\|COCO_INSTRUCTION" "$f" 2>/dev/null && \
+       SHARED_MANIFEST="EXISTS" && SHARED_MANIFEST_FILE="$f" && echo "Shared manifest: $f"
+   done
    ```
 
-2. **Find section** `<!-- START -- snow-utils-networks:{NW_RULE_NAME} -->`
+   **If BOTH exist, ask user:**
+
+   ```
+   ⚠️ Found two manifests:
+     1. Working manifest: .snow-utils/snow-utils-manifest.md (Status: <WORKING_STATUS>)
+     2. Shared manifest: <SHARED_MANIFEST_FILE>
+
+   Which should we use for networks replay?
+     A. Resume working manifest
+     B. Start fresh from shared manifest (adapt values for your account)
+     C. Cancel
+   ```
+
+   **⚠️ STOP**: Wait for user choice.
+
+   | Choice | Action |
+   |--------|--------|
+   | **A** | Use working manifest → step 2 |
+   | **B** | Backup working to `.bak`, copy shared to `.snow-utils/snow-utils-manifest.md` → step 1b |
+   | **C** | Stop. |
+
+   **If ONLY shared manifest:** Copy to `.snow-utils/snow-utils-manifest.md` → step 1b.
+   **If ONLY working manifest:** Go to step 2.
+
+1b. **Shared manifest adapt-check (ALWAYS run for shared manifests):**
+
+   ```bash
+   IS_SHARED=$(grep -c "## shared_info\|COCO_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+   if [ "$IS_SHARED" -gt 0 ]; then
+     ADAPT_COUNT=$(grep -c "# ADAPT:" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+     echo "Shared manifest detected. ADAPT markers: ${ADAPT_COUNT}"
+   fi
+   ```
+
+   **If `ADAPT_COUNT` > 0:** Extract `shared_by` from `## shared_info`, get current user's `SNOWFLAKE_USER`, show adaptation screen for network values (NW_RULE_NAME, NW_RULE_DB). Three options: Accept adapted / Edit specific / Keep originals. Apply to manifest.
+
+   **If `ADAPT_COUNT` = 0:** No markers, proceed with values as-is.
+
+2. **Read manifest and find section** `<!-- START -- snow-utils-networks:{NW_RULE_NAME} -->`
    - If section NOT found: "No network resources in manifest. Nothing to replay for networks."
    - If section found: Continue to step 3
 
@@ -842,9 +935,18 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
       If any value is empty, ask user to enter manually or abort.
 
-   g. **Detect shared manifest and offer name adaptation:**
+   g. **Shared manifest adapt-check (ALWAYS run for shared manifests):**
 
-      If manifest contains `# ADAPT: user-prefixed` markers, detect prefix mismatch and show the **combined summary + adaptation screen** (see BEST_PRACTICES "Name Adaptation During Replay"). Network rule names typically derive from SA_USER, so adaptation applies to `NW_RULE_NAME` if user-prefixed.
+      If adaptation was already done in step 1b, skip this step.
+
+      ```bash
+      IS_SHARED=$(grep -c "## shared_info\|COCO_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+      [ "$IS_SHARED" -gt 0 ] && ADAPT_COUNT=$(grep -c "# ADAPT:" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+      ```
+
+      If shared AND `ADAPT_COUNT` > 0: show adaptation screen for NW_RULE_NAME, NW_RULE_DB (see step 1b).
+      If shared AND no markers: proceed with values as-is.
+      If not shared: skip.
 
    h. Write values (adapted or original) to `.env` (only if not already set):
 
@@ -902,7 +1004,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
      [--policy {NW_RULE_NAME}_POLICY] --dry-run
    ```
 
-   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result into your response as a fenced code block so the user can see the resource summary AND all SQL statements.
+   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result using language-tagged code blocks: ` ```text ` for summary, ` ```sql ` for SQL. See Step 4 formatting example above.
 
    Then ask:
 
@@ -1239,10 +1341,10 @@ If you need IPv6 support, you would need to create a separate network rule with 
 
 ## Stopping Points
 
-- ✋ Step 1: If connection checks fail
-- ✋ Step 2: If infra check needed (prompts user)
-- ✋ Step 3: After gathering requirements
-- ✋ Step 4: After dry-run preview (get approval)
+1. ✋ Step 1: If connection checks fail
+2. ✋ Step 2: If infra check needed (prompts user)
+3. ✋ Step 3: After gathering requirements
+4. ✋ Step 4: After dry-run preview (get approval)
 
 ## Output
 

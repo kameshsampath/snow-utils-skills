@@ -46,6 +46,8 @@ When about to write/edit a sensitive value like `SA_PAT`:
 
 **📍 MANIFEST FILE:** `.snow-utils/snow-utils-manifest.md` (ALWAYS this exact path and filename - never search for other patterns like *.yaml or *.*)
 
+> **⛔ DO NOT hand-edit manifests.** Manifests are machine-managed by Cortex Code. Manual edits can corrupt the format and break replay, cleanup, and export flows. Use skill commands to modify resources instead.
+
 **⚠️ CONNECTION USAGE:** This skill uses the **user's Snowflake connection** (SNOWFLAKE_DEFAULT_CONNECTION_NAME) to create the SA infrastructure. It requires admin_role (from manifest, defaults to ACCOUNTADMIN) to create users, network policies, and authentication policies. The output (SA_PAT) is then used by apps/demos to consume resources.
 
 **🔄 IDEMPOTENCY NOTE:** Network rules use `CREATE OR REPLACE` (Snowflake does not support `IF NOT EXISTS` for network rules). Network policies use `CREATE IF NOT EXISTS` to preserve existing policies. Re-running create operations is safe for automation.
@@ -104,7 +106,7 @@ tools_verified: <TODAY_DATE>
 skills:
 
 ## dependent_skills
-snow-utils-networks: https://github.com/kameshsampath/snow-utils-skills/snow-utils-networks
+- snow-utils-networks: https://github.com/kameshsampath/snow-utils-skills/snow-utils-networks
 EOF
 fi
 # Add this skill's source URL if not already present
@@ -514,32 +516,49 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 **After the command completes, you MUST:**
 
 1. Read the full terminal output from the command
-2. Copy-paste the ENTIRE output into your response as a fenced code block
+2. Copy-paste the ENTIRE output into your response using **language-tagged** markdown code blocks
 3. The output includes both a resource summary AND full SQL for every step
+
+**Formatting rules:**
+
+- Use ` ```text ` for the resource summary section
+- Use ` ```sql ` for the SQL statements section
+- Split the output into labeled sections for readability
 
 **❌ WRONG:** Just running the command and letting the terminal output speak for itself (it gets truncated).
 **❌ WRONG:** Constructing your own summary box or table instead of showing CLI output.
 **❌ WRONG:** Saying "see the output above" -- the user CANNOT see collapsed terminal output.
-**✅ RIGHT:** Pasting the full CLI output in your response like this:
+**❌ WRONG:** Pasting everything into one bare ` ``` ` block without language tags.
+**✅ RIGHT:** Pasting the CLI output with proper formatting like this:
 
 ````
 Here is the dry-run preview:
 
-```
+**Resource Summary:**
+
+```text
 ==================================================
 Snowflake PAT Manager
   [DRY RUN]
 ==================================================
-User:     ...
-Role:     ...
+User:     BOBS_HIRC_DUCKDB_DEMO_RUNNER
+Role:     BOBS_HIRC_DUCKDB_DEMO_ACCESS
+Database: BOBS_SNOW_UTILS
 ...
-SQL that would be executed:
-────────────────────────────────────────────────────────────
+```
+
+**SQL that would be executed:**
+
+```sql
 -- Step 1: Create service user
 USE ROLE ACCOUNTADMIN;
-CREATE USER IF NOT EXISTS ...
+CREATE USER IF NOT EXISTS BOBS_HIRC_DUCKDB_DEMO_RUNNER
+  TYPE = SERVICE
+  DEFAULT_ROLE = BOBS_HIRC_DUCKDB_DEMO_ACCESS;
+
+-- Step 2: Create network rule
+CREATE OR REPLACE NETWORK RULE ...
 ...
-────────────────────────────────────────────────────────────
 ```
 
 Proceed with creating these resources? [yes/no]
@@ -967,13 +986,62 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 
 **If user asks to replay/recreate from manifest:**
 
-1. **Read manifest from current project directory:**
+1. **Detect manifest(s) in current directory:**
 
    ```bash
-   cat .snow-utils/snow-utils-manifest.md
+   WORKING_MANIFEST=""
+   SHARED_MANIFEST=""
+   SHARED_MANIFEST_FILE=""
+
+   [ -f .snow-utils/snow-utils-manifest.md ] && WORKING_MANIFEST="EXISTS" && \
+     WORKING_STATUS=$(grep "^Status:" .snow-utils/snow-utils-manifest.md | head -1 | awk '{print $2}') && \
+     echo "Working manifest: Status=${WORKING_STATUS}"
+
+   for f in *-manifest.md; do
+     [ -f "$f" ] && grep -q "## shared_info\|COCO_INSTRUCTION" "$f" 2>/dev/null && \
+       SHARED_MANIFEST="EXISTS" && SHARED_MANIFEST_FILE="$f" && echo "Shared manifest: $f"
+   done
    ```
 
-2. **Find section** `<!-- START -- snow-utils-pat -->`
+   **If BOTH exist, ask user:**
+
+   ```
+   ⚠️ Found two manifests:
+     1. Working manifest: .snow-utils/snow-utils-manifest.md (Status: <WORKING_STATUS>)
+     2. Shared manifest: <SHARED_MANIFEST_FILE>
+
+   Which should we use for PAT replay?
+     A. Resume working manifest
+     B. Start fresh from shared manifest (adapt values for your account)
+     C. Cancel
+   ```
+
+   **⚠️ STOP**: Wait for user choice.
+
+   | Choice | Action |
+   |--------|--------|
+   | **A** | Use working manifest → step 2 |
+   | **B** | Backup working to `.bak`, copy shared to `.snow-utils/snow-utils-manifest.md` → step 1b |
+   | **C** | Stop. |
+
+   **If ONLY shared manifest:** Copy to `.snow-utils/snow-utils-manifest.md` → step 1b.
+   **If ONLY working manifest:** Go to step 2.
+
+1b. **Shared manifest adapt-check (ALWAYS run for shared manifests):**
+
+   ```bash
+   IS_SHARED=$(grep -c "## shared_info\|COCO_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+   if [ "$IS_SHARED" -gt 0 ]; then
+     ADAPT_COUNT=$(grep -c "# ADAPT:" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+     echo "Shared manifest detected. ADAPT markers: ${ADAPT_COUNT}"
+   fi
+   ```
+
+   **If `ADAPT_COUNT` > 0:** Extract `shared_by` from `## shared_info`, get current user's `SNOWFLAKE_USER`, show adaptation screen for PAT values (SA_USER, SA_ROLE, SNOW_UTILS_DB). Three options: Accept adapted / Edit specific / Keep originals. Apply to manifest.
+
+   **If `ADAPT_COUNT` = 0:** No markers, proceed with values as-is.
+
+2. **Read manifest and find section** `<!-- START -- snow-utils-pat -->`
    - If section NOT found: "No PAT resources in manifest. Nothing to replay for PAT."
    - If section found: Continue to step 3
 
@@ -1032,9 +1100,20 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
       If any value is empty, ask user to enter manually or abort.
       Note: `PAT_DEFAULT_EXPIRY` and `PAT_MAX_EXPIRY` are optional — if missing, use defaults (90/365).
 
-   f. **Detect shared manifest and offer name adaptation:**
+   f. **Shared manifest adapt-check (ALWAYS run for shared manifests):**
 
-      If manifest contains `# ADAPT: user-prefixed` markers, extract `shared_by` from `## shared_info` and Bob's `SNOWFLAKE_USER`. If prefixes differ, show the **combined summary + adaptation screen** (see BEST_PRACTICES "Name Adaptation During Replay"). If not shared, skip adaptation.
+      If adaptation was already done in step 1b, skip this step.
+
+      Otherwise, detect shared origin and scan for `# ADAPT:` markers:
+
+      ```bash
+      IS_SHARED=$(grep -c "## shared_info\|COCO_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+      [ "$IS_SHARED" -gt 0 ] && ADAPT_COUNT=$(grep -c "# ADAPT:" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+      ```
+
+      If shared AND `ADAPT_COUNT` > 0: show adaptation screen (see step 1b).
+      If shared AND no markers: proceed with values as-is.
+      If not shared: skip.
 
    g. Write values (adapted or original) to `.env` (only if not already set):
 
@@ -1102,7 +1181,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
      --default-expiry-days {DEFAULT_EXPIRY} --max-expiry-days {MAX_EXPIRY} --dry-run
    ```
 
-   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result into your response as a fenced code block so the user can see the resource summary AND all SQL statements.
+   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result using language-tagged code blocks: ` ```text ` for summary, ` ```sql ` for SQL. See Step 4 formatting example above.
 
    Then ask:
 
@@ -1514,11 +1593,11 @@ uv run --project <SKILL_DIR> snow-utils-pat \
 
 ## Stopping Points
 
-- Step 1: If connection checks fail
-- Step 2: If infra check needed (prompts user)
-- Step 3: After gathering requirements
-- Step 3a: If PAT exists (ask rotate/recreate/cancel)
-- Step 4: After dry-run preview (get approval)
+1. Step 1: If connection checks fail
+2. Step 2: If infra check needed (prompts user)
+3. Step 3: After gathering requirements
+4. Step 3a: If PAT exists (ask rotate/recreate/cancel)
+5. Step 4: After dry-run preview (get approval)
 
 ## Output
 

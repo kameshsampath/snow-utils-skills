@@ -19,6 +19,8 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud stor
 >
 > **📍 Location:** `.snow-utils/snow-utils-manifest.md` (ALWAYS this exact path - never search for *.yaml or other patterns)
 >
+> **⛔ DO NOT hand-edit manifests.** Manifests are machine-managed by Cortex Code. Manual edits can corrupt the format and break replay, cleanup, and export flows. Use skill commands to modify resources instead.
+>
 > **🔒 Security:** Secured like `.ssh` (chmod 700 directory, chmod 600 files)
 >
 > **Skill-Scoped Admin Roles:**
@@ -396,13 +398,12 @@ uv run --project <SKILL_DIR> snow-utils-volumes \
 **After the command completes, you MUST:**
 
 1. Read the full terminal output from the command
-2. Copy-paste the ENTIRE output into your response as a fenced code block
-3. The output includes ALL of the following -- do NOT omit any section:
-   - **AWS resource summary** (S3 bucket, IAM role name, IAM policy name)
-   - **Snowflake resource summary** (external volume name)
-   - **Full IAM policy JSON** (the S3 access permissions document)
-   - **Full IAM trust policy JSON** (the Snowflake cross-account trust document)
-   - **Full Snowflake SQL** (CREATE EXTERNAL VOLUME statement)
+2. Copy-paste the ENTIRE output into your response using **language-tagged** markdown code blocks
+3. **Split the output into labeled sections** -- each with the appropriate language tag:
+   - ` ```text ` for the resource summary (AWS + Snowflake)
+   - ` ```json ` for the IAM policy JSON
+   - ` ```json ` for the IAM trust policy JSON
+   - ` ```sql ` for the CREATE EXTERNAL VOLUME statement
 
 > **Note:** External volumes are account-level objects in Snowflake (no database/schema prefix).
 
@@ -413,7 +414,74 @@ permissions and trust relationships before approving resource creation.
 **❌ WRONG:** Constructing your own summary box or template instead of showing CLI output.
 **❌ WRONG:** Saying "see the output above" -- the user CANNOT see collapsed terminal output.
 **❌ WRONG:** Pasting only the SQL but omitting the IAM policy / trust policy JSON.
-**✅ RIGHT:** Pasting the FULL CLI output in your response, including all JSON and SQL.
+**❌ WRONG:** Pasting everything into one bare ` ``` ` block without language tags.
+**✅ RIGHT:** Pasting the CLI output with proper formatting like this:
+
+````
+Here is the dry-run preview:
+
+**Resource Summary:**
+
+```text
+==================================================
+Snowflake External Volume Manager
+  [DRY RUN]
+==================================================
+AWS Region:       us-west-2
+S3 Bucket:        iceberg-data
+IAM Role:         snowflake-iceberg-data-role
+IAM Policy:       snowflake-iceberg-data-policy
+External Volume:  ICEBERG_DATA_EXTERNAL_VOLUME
+...
+```
+
+**IAM Policy (S3 access permissions):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:ListBucket", ...],
+      "Resource": ["arn:aws:s3:::iceberg-data", "arn:aws:s3:::iceberg-data/*"]
+    }
+  ]
+}
+```
+
+**IAM Trust Policy (Snowflake cross-account trust):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam:::<snowflake_account_id>:root" },
+      "Action": "sts:AssumeRole",
+      "Condition": { "StringEquals": { "sts:ExternalId": "..." } }
+    }
+  ]
+}
+```
+
+**Snowflake SQL:**
+
+```sql
+CREATE OR REPLACE EXTERNAL VOLUME ICEBERG_DATA_EXTERNAL_VOLUME
+  STORAGE_LOCATIONS = (
+    (
+      NAME = 'iceberg-data-s3'
+      STORAGE_BASE_URL = 's3://iceberg-data/'
+      STORAGE_PROVIDER = 'S3'
+      STORAGE_AWS_ROLE_ARN = 'arn:aws:iam:::<account>:role/snowflake-iceberg-data-role'
+    )
+  );
+```
+
+Proceed with creating these resources? [yes/no]
+````
 
 > 🔄 **On pause/resume:** Re-run `--dry-run` and paste the complete output again before asking for confirmation.
 
@@ -713,11 +781,11 @@ snow-utils-volumes verify --volume-name MY_EXTERNAL_VOLUME
 
 ## Stopping Points
 
-- ✋ Step 1: If connection or AWS checks fail
-- ✋ Step 2: If infra check needed (prompts user)
-- ✋ Step 3: If volume exists (ask user what to do)
-- ✋ Step 4: After gathering requirements
-- ✋ Step 5: After dry-run preview (get approval)
+1. ✋ Step 1: If connection or AWS checks fail
+2. ✋ Step 2: If infra check needed (prompts user)
+3. ✋ Step 3: If volume exists (ask user what to do)
+4. ✋ Step 4: After gathering requirements
+5. ✋ Step 5: After dry-run preview (get approval)
 
 ## Output
 
@@ -761,13 +829,62 @@ snow-utils-volumes verify --volume-name MY_EXTERNAL_VOLUME
 
 **If user asks to replay/recreate from manifest:**
 
-1. **Read manifest from current project directory:**
+1. **Detect manifest(s) in current directory:**
 
    ```bash
-   cat .snow-utils/snow-utils-manifest.md
+   WORKING_MANIFEST=""
+   SHARED_MANIFEST=""
+   SHARED_MANIFEST_FILE=""
+
+   [ -f .snow-utils/snow-utils-manifest.md ] && WORKING_MANIFEST="EXISTS" && \
+     WORKING_STATUS=$(grep "^Status:" .snow-utils/snow-utils-manifest.md | head -1 | awk '{print $2}') && \
+     echo "Working manifest: Status=${WORKING_STATUS}"
+
+   for f in *-manifest.md; do
+     [ -f "$f" ] && grep -q "## shared_info\|COCO_INSTRUCTION" "$f" 2>/dev/null && \
+       SHARED_MANIFEST="EXISTS" && SHARED_MANIFEST_FILE="$f" && echo "Shared manifest: $f"
+   done
    ```
 
-2. **Find section** `<!-- START -- snow-utils-volumes -->`
+   **If BOTH exist, ask user:**
+
+   ```
+   ⚠️ Found two manifests:
+     1. Working manifest: .snow-utils/snow-utils-manifest.md (Status: <WORKING_STATUS>)
+     2. Shared manifest: <SHARED_MANIFEST_FILE>
+
+   Which should we use for volumes replay?
+     A. Resume working manifest
+     B. Start fresh from shared manifest (adapt values for your account)
+     C. Cancel
+   ```
+
+   **⚠️ STOP**: Wait for user choice.
+
+   | Choice | Action |
+   |--------|--------|
+   | **A** | Use working manifest → step 2 |
+   | **B** | Backup working to `.bak`, copy shared to `.snow-utils/snow-utils-manifest.md` → step 1b |
+   | **C** | Stop. |
+
+   **If ONLY shared manifest:** Copy to `.snow-utils/snow-utils-manifest.md` → step 1b.
+   **If ONLY working manifest:** Go to step 2.
+
+1b. **Shared manifest adapt-check (ALWAYS run for shared manifests):**
+
+   ```bash
+   IS_SHARED=$(grep -c "## shared_info\|COCO_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+   if [ "$IS_SHARED" -gt 0 ]; then
+     ADAPT_COUNT=$(grep -c "# ADAPT:" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+     echo "Shared manifest detected. ADAPT markers: ${ADAPT_COUNT}"
+   fi
+   ```
+
+   **If `ADAPT_COUNT` > 0:** Extract `shared_by` from `## shared_info`, get current user's `SNOWFLAKE_USER`, show adaptation screen for volume values (BUCKET, EXTERNAL_VOLUME_NAME, EXTVOLUME_PREFIX). Three options: Accept adapted / Edit specific / Keep originals. Apply to manifest.
+
+   **If `ADAPT_COUNT` = 0:** No markers, proceed with values as-is.
+
+2. **Read manifest and find section** `<!-- START -- snow-utils-volumes -->`
    - If section NOT found: "No external volume resources in manifest. Nothing to replay for volumes."
    - If section found: Continue to step 3
 
@@ -824,9 +941,18 @@ snow-utils-volumes verify --volume-name MY_EXTERNAL_VOLUME
 
       If any value is empty, ask user to enter manually or abort.
 
-   f. **Detect shared manifest and offer name adaptation:**
+   f. **Shared manifest adapt-check (ALWAYS run for shared manifests):**
 
-      If manifest contains `# ADAPT: user-prefixed` markers, detect prefix mismatch and show the **combined summary + adaptation screen** (see BEST_PRACTICES "Name Adaptation During Replay"). `EXTERNAL_VOLUME_NAME` and `EXTVOLUME_PREFIX` may need adaptation if user-prefixed.
+      If adaptation was already done in step 1b, skip this step.
+
+      ```bash
+      IS_SHARED=$(grep -c "## shared_info\|COCO_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+      [ "$IS_SHARED" -gt 0 ] && ADAPT_COUNT=$(grep -c "# ADAPT:" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+      ```
+
+      If shared AND `ADAPT_COUNT` > 0: show adaptation screen for BUCKET, EXTERNAL_VOLUME_NAME, EXTVOLUME_PREFIX (see step 1b).
+      If shared AND no markers: proceed with values as-is.
+      If not shared: skip.
 
    g. Write values (adapted or original) to `.env` (only if not already set):
 
@@ -882,7 +1008,7 @@ snow-utils-volumes verify --volume-name MY_EXTERNAL_VOLUME
      create --bucket {BUCKET} --dry-run
    ```
 
-   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result into your response as a fenced code block -- including resource summaries, full IAM policy JSON, full trust policy JSON, and full CREATE EXTERNAL VOLUME SQL. Do NOT omit the JSON sections.
+   **🔴 CRITICAL:** Terminal output gets truncated by the UI. After running the command, read the terminal output and paste the ENTIRE result into your response using language-tagged code blocks: ` ```text ` for summary, ` ```json ` for IAM/trust policy JSON, ` ```sql ` for CREATE EXTERNAL VOLUME SQL. See Step 5 formatting example above. Do NOT omit the JSON sections.
 
    Then ask:
 
