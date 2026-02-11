@@ -150,35 +150,35 @@ The manifest can be **exported and shared** with another developer so they can r
 ```mermaid
 sequenceDiagram
     participant Alice
-    participant CC as Cortex Code (Alice)
+    participant CC as Cortex_Code_Alice
     participant Email
     participant Bob
-    participant CC2 as Cortex Code (Bob)
+    participant CC2 as Cortex_Code_Bob
     participant SF as Snowflake
 
-    Note over Alice,CC: Alice has a working setup (all COMPLETE)
+    Note over Alice,CC: Alice has a working PAT setup (COMPLETE)
 
     Alice->>CC: "export manifest for sharing"
     CC->>CC: Verify all sections COMPLETE
-    CC->>CC: Copy manifest → hirc-duckdb-demo-manifest.md
+    CC->>CC: Copy manifest to pat-demo-manifest.md
     CC->>CC: Set statuses to REMOVED
-    CC->>CC: Add # ADAPT markers on user-prefixed values
+    CC->>CC: Add ADAPT markers on user-prefixed values
     CC->>CC: Inject COCO_INSTRUCTION + shared_info + required_skills
     CC-->>Alice: Export saved to project root
 
-    Alice->>Email: Send hirc-duckdb-demo-manifest.md
+    Alice->>Email: Send pat-demo-manifest.md
 
     Email-->>Bob: Receives manifest file
 
     Bob->>CC2: Opens file, asks "setup from shared manifest"
     CC2->>CC2: Reads COCO_INSTRUCTION, checks required_skills
-    CC2->>Bob: "Install missing skills? (hirc-duckdb-demo, snow-utils-pat, ...)"
+    CC2->>Bob: "Install missing skill? (snow-utils-pat)"
     Bob-->>CC2: Yes
-    CC2->>CC2: cortex skill add for each missing skill
-    CC2->>Bob: "Create project dir ./hirc-duckdb-demo?"
+    CC2->>CC2: cortex skill add snow-utils-pat
+    CC2->>Bob: "Create project dir ./pat-demo?"
     Bob-->>CC2: Yes
 
-    CC2->>CC2: Create dir, move manifest to .snow-utils/
+    CC2->>CC2: Create dir, copy manifest to .snow-utils/
     CC2->>Bob: "Which Snowflake connection?"
     Bob-->>CC2: Selects connection
 
@@ -186,13 +186,13 @@ sequenceDiagram
     SF-->>CC2: Account, user (BOBS), URL
 
     CC2->>Bob: Combined summary + adaptation screen
-    Note over CC2,Bob: Original (ALICE) → Your Value (BOBS)
+    Note over CC2,Bob: Original (ALICE) to Your Value (BOBS)
     Bob-->>CC2: Confirm all
 
-    CC2->>SF: Create resources with adapted names
+    CC2->>SF: Create PAT resources with adapted names
     SF-->>CC2: All resources created
 
-    CC2-->>Bob: Setup complete!
+    CC2-->>Bob: PAT setup complete!
 ```
 
 ### Key Concepts
@@ -210,41 +210,41 @@ sequenceDiagram
 
 ```markdown
 <!-- COCO_INSTRUCTION: This is a shared snow-utils manifest.
-     project_name: hirc-duckdb-demo
+     project_name: pat-demo
      setup_steps:
        1. Check if required skills are installed: cortex skill list
        2. For each skill in ## required_skills NOT in the list, run: cortex skill add <url>
-       3. Once all skills installed, follow hirc-duckdb-demo SKILL.md "Setup from Shared Manifest Flow"
-     To trigger: ask "setup from shared manifest" -->
+       3. Once all skills installed, ask "replay pat from manifest"
+     To trigger: ask "setup from shared manifest" or "replay pat" -->
 
 # Snow-Utils Manifest
 
 ## shared_info
 shared_by: ALICE
-shared_date: 2026-02-07
-original_project_dir: hirc-duckdb-demo
+shared_date: 2026-02-11
+original_project_dir: pat-demo
 notes: |
-  To replay: open in Cursor, ask "setup from shared manifest"
+  PAT Demo - Create a Snowflake Programmatic Access Token for a service account.
+  To replay: open in Cortex Code, ask "setup from shared manifest" or "replay pat"
 
 ## required_skills
-hirc-duckdb-demo: https://github.com/kameshsampath/kamesh-demo-skills/hirc-duckdb-demo
 snow-utils-pat: https://github.com/kameshsampath/snow-utils-skills/snow-utils-pat
-snow-utils-volumes: https://github.com/kameshsampath/snow-utils-skills/snow-utils-volumes
 
 ## project_recipe
-project_name: hirc-duckdb-demo
+project_name: pat-demo
 
-<!-- START: snow-utils-pat -->
-## snow-utils-pat
-**Status:** REMOVED
-**User:** ALICE_HIRC_DUCKDB_DEMO_RUNNER  # ADAPT: user-prefixed
-**Role:** ALICE_HIRC_DUCKDB_DEMO_ACCESS  # ADAPT: user-prefixed
+<!-- START -- snow-utils-pat:ALICE_PAT_DEMO_RUNNER -->
+## PAT: ALICE_PAT_DEMO_RUNNER
+**User:** ALICE_PAT_DEMO_RUNNER  # ADAPT: user-prefixed
+**Role:** ALICE_PAT_DEMO_ACCESS  # ADAPT: user-prefixed
 **Database:** ALICE_SNOW_UTILS  # ADAPT: user-prefixed
+**PAT Name:** ALICE_PAT_DEMO_RUNNER_PAT  # ADAPT: user-prefixed
 **Default Expiry (days):** 90
 **Max Expiry (days):** 365
-**Actual Expiry:** 2026-05-08
-...
-<!-- END: snow-utils-pat -->
+**Auth Policy:** ALICE_PAT_DEMO_RUNNER_AUTH_POLICY  # ADAPT: user-prefixed
+**admin_role:** ACCOUNTADMIN
+**Status:** REMOVED
+<!-- END -- snow-utils-pat:ALICE_PAT_DEMO_RUNNER -->
 ```
 
 ### Name Adaptation (Combined Summary Screen)
@@ -252,17 +252,16 @@ project_name: hirc-duckdb-demo
 When Bob replays, Cortex Code detects the prefix mismatch and shows one unified screen:
 
 ```
-Replaying shared manifest for: hirc-duckdb-demo
+Replaying shared manifest for: pat-demo
 Shared by: ALICE | Your user: BOBS
 
-  Resource                    Original (ALICE)                     → Your Value (BOBS)
-  ─────────────────────────────────────────────────────────────────────────────────────
-  Service User                ALICE_HIRC_DUCKDB_DEMO_RUNNER        → BOBS_HIRC_DUCKDB_DEMO_RUNNER
-  Service Role                ALICE_HIRC_DUCKDB_DEMO_ACCESS        → BOBS_HIRC_DUCKDB_DEMO_ACCESS
-  Utils Database              ALICE_SNOW_UTILS                     → BOBS_SNOW_UTILS
-  ─────────────────────────────────────────────────────────────────────────────────────
-  S3 Bucket                   iceberg-data                          (unchanged)
-  Region                      us-west-2                             (unchanged)
+  Resource                    Original (ALICE)                → Your Value (BOBS)
+  ────────────────────────────────────────────────────────────────────────────────
+  Service User                ALICE_PAT_DEMO_RUNNER           → BOBS_PAT_DEMO_RUNNER
+  Service Role                ALICE_PAT_DEMO_ACCESS           → BOBS_PAT_DEMO_ACCESS
+  Utils Database              ALICE_SNOW_UTILS                → BOBS_SNOW_UTILS
+  PAT Name                    ALICE_PAT_DEMO_RUNNER_PAT       → BOBS_PAT_DEMO_RUNNER_PAT
+  Auth Policy                 ALICE_PAT_DEMO_RUNNER_AUTH_...  → BOBS_PAT_DEMO_RUNNER_AUTH_...
 
 Options:
 1. Confirm all (with adaptations) → proceed
