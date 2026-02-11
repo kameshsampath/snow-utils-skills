@@ -21,6 +21,7 @@ Creates service users, network policies, authentication policies, and Programmat
 - **NEVER run raw SQL for cleanup** - ALWAYS use `snow-utils-pat remove` command (handles dependency order automatically)
 - **NEVER create resources without showing SQL and getting confirmation first**
 - **NEVER offer to drop SNOW_UTILS_DB** - it is shared infrastructure; `remove` only drops resources *inside* it (policies, schemas), never the database itself
+- **NEVER guess or invent CLI options** - ONLY use options from the CLI Reference tables; if a command fails with "No such option", run `<command> --help` and use ONLY those options
 - If .env values are empty, prompt user or run `check-setup` CLI
 
 **Writing Sensitive Values (SA_PAT):**
@@ -655,10 +656,9 @@ Proceed to Step 5c.
 
 > Step 4 already showed SQL and got user approval. Now updating .env with PAT.
 
-**🔴 SECURITY: The CLI writes SA_PAT directly to `.env` via `--dot-env-file`.**
-**NEVER use `sed` or shell commands to write the token -- the raw value would leak in command text.**
+**🔴 SECURITY: The CLI writes SA_PAT directly to `.env`. NEVER use `sed` or shell commands to write the token -- the raw value would leak in command text.**
 
-The `create` command with `--dot-env-file` handles `.env` update internally:
+First, run `snow-utils-pat create --help` to confirm which options are available, then build the command using ONLY those options:
 
 ```bash
 uv run --project <SKILL_DIR> snow-utils-pat \
@@ -666,6 +666,8 @@ uv run --project <SKILL_DIR> snow-utils-pat \
   --default-expiry-days <DEFAULT_EXPIRY> --max-expiry-days <MAX_EXPIRY> \
   --dot-env-file .env
 ```
+
+> **Fallback:** If `--dot-env-file` is not available (command fails with "No such option"), drop that flag. The CLI still writes SA_PAT to `.env` via `--env-path` (default `.env`). Run `uv lock --upgrade-package snow-utils` to pick up the latest version that includes `--dot-env-file`.
 
 > The CLI writes `SA_PAT`, `SA_USER`, and `SA_ROLE` to `.env` internally.
 > The raw token **never** appears in shell output or command text.
@@ -1191,7 +1193,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 
    **⚠️ STOP**: Wait for user confirmation.
 
-7. **On "yes":** Run actual command with `--dot-env-file` (ONE bash approval, NO further prompts):
+7. **On "yes":** First run `snow-utils-pat create --help` to confirm available options, then execute (ONE bash approval, NO further prompts):
 
    ```bash
    uv run --project <SKILL_DIR> snow-utils-pat \
@@ -1202,7 +1204,8 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 
    > **⚠️ CRITICAL:** ALWAYS include `--default-expiry-days` and `--max-expiry-days` using values from the manifest.
    > NEVER omit these flags or use alternative parameter names. If manifest values are missing, use `--default-expiry-days 90 --max-expiry-days 365`.
-   > **🔴 SECURITY:** ALWAYS use `--dot-env-file .env` so the token is written internally. NEVER use `sed` or shell commands.
+   > **🔴 SECURITY:** NEVER use `sed` or shell commands to write the token.
+   > **Fallback:** If `--dot-env-file` is not available ("No such option"), drop that flag -- the CLI writes SA_PAT to `.env` via `--env-path` anyway.
 
    - CLI shows progress for each step automatically
    - **NO additional user prompts until complete**
@@ -1370,9 +1373,13 @@ Fix the PAT issue, then run "replay all" again to continue.
 **When updating .env programmatically:**
 
 ```bash
-# ALWAYS use --dot-env-file to write SA_PAT securely
+# Preferred: use --dot-env-file to write SA_PAT securely
 uv run --project <SKILL_DIR> snow-utils-pat \
   create ... --dot-env-file .env
+
+# Fallback if --dot-env-file unavailable: CLI writes to .env via --env-path anyway
+uv run --project <SKILL_DIR> snow-utils-pat \
+  create ... --env-path .env
 
 # NEVER use sed/echo/shell to write the token -- it leaks in command text
 # NEVER echo/cat the .env file after adding PAT
@@ -1473,6 +1480,12 @@ uv run --project <SKILL_DIR> check-setup
 - `remove` -- NOT "delete", "destroy", "cleanup", "drop"
 - `rotate` -- NOT "refresh", "renew", "regenerate"
 - `verify` -- NOT "check", "test", "validate", "ping"
+
+**🔴 OPTION NAMES (NEVER guess or invent options):**
+
+> ONLY use options listed in the CLI Reference tables below.
+> If a command fails with "No such option", run `snow-utils-pat <command> --help` to see actual available options and use ONLY those.
+> NEVER invent, abbreviate, or rename options (e.g., `--dot-env-file` is NOT `--env-file`, `--default-expiry-days` is NOT `--expiry`).
 
 #### create
 

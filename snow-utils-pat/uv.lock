@@ -195,7 +195,7 @@ wheels = [
 [[package]]
 name = "snow-utils"
 version = "0.1.0"
-source = { git = "https://github.com/kameshsampath/snow-utils#099ea10218d017ac011c8f43c55840a1cfe3ae18" }
+source = { git = "https://github.com/kameshsampath/snow-utils?branch=main#9586a8c1b31937f00f46f813a349584de3cb2a39" }
 dependencies = [
     { name = "boto3" },
     { name = "click" },
@@ -207,7 +207,7 @@ dependencies = [
 [[package]]
 name = "snow-utils-common"
 version = "0.1.0"
-source = { git = "https://github.com/kameshsampath/snow-utils?subdirectory=common#099ea10218d017ac011c8f43c55840a1cfe3ae18" }
+source = { git = "https://github.com/kameshsampath/snow-utils?subdirectory=common&branch=main#9586a8c1b31937f00f46f813a349584de3cb2a39" }
 dependencies = [
     { name = "click" },
     { name = "requests" },
@@ -222,7 +222,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "snow-utils", git = "https://github.com/kameshsampath/snow-utils" }]
+requires-dist = [{ name = "snow-utils", git = "https://github.com/kameshsampath/snow-utils?branch=main" }]
 
 [[package]]
 name = "urllib3"

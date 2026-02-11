@@ -42,6 +42,7 @@ Creates S3 bucket, IAM role/policy, and Snowflake external volume for cloud stor
 - NEVER leave .snow-utils unsecured - always chmod 700/600
 - NEVER delete .snow-utils directory or manifest file - preserve for audit/cleanup/replay
 - **NEVER offer to drop SNOW_UTILS_DB** - it is shared infrastructure; cleanup only drops resources *inside* it, never the database itself
+- **NEVER guess or invent CLI options** - ONLY use options from the CLI Reference tables; if a command fails with "No such option", run `<command> --help` and use ONLY those options
 - If .env values are empty, prompt user or run `check-setup` CLI
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
@@ -706,6 +707,12 @@ uv run --project <SKILL_DIR> check-setup
 - `verify` -- NOT "check", "test", "validate", "ping"
 - `describe` -- NOT "show", "get", "info", "status"
 - `update-trust` -- NOT "sync-trust", "refresh-trust"
+
+**🔴 OPTION NAMES (NEVER guess or invent options):**
+
+> ONLY use options listed in the CLI Reference tables below.
+> If a command fails with "No such option", run `snow-utils-volumes <command> --help` to see actual available options and use ONLY those.
+> NEVER invent, abbreviate, or rename options.
 
 **Global Options (BEFORE command):**
 

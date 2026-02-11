@@ -28,6 +28,7 @@ Creates and manages network rules and policies for IP-based access control in Sn
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
 - **NEVER run raw SQL for cleanup** - ALWAYS use CLI commands (handles dependency order and detach/reattach)
 - **NEVER offer to drop SNOW_UTILS_DB** - it is shared infrastructure; cleanup only drops resources *inside* it (network rules, schemas), never the database itself
+- **NEVER guess or invent CLI options** - ONLY use options from the CLI Reference tables; if a command fails with "No such option", run `<command> --help` and use ONLY those options
 - If .env values are empty, prompt user or run `check-setup` CLI
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
@@ -1225,6 +1226,12 @@ uv run --project <SKILL_DIR> check-setup
 - `policy create` -- NOT "policy setup", "policy make"
 - `policy delete` -- NOT "policy remove", "policy destroy"
 - `policy assign` -- NOT "policy attach", "policy apply", "policy set"
+
+**🔴 OPTION NAMES (NEVER guess or invent options):**
+
+> ONLY use options listed in the CLI Reference tables below.
+> If a command fails with "No such option", run `snow-utils-networks <subcommand> --help` to see actual available options and use ONLY those.
+> NEVER invent, abbreviate, or rename options.
 
 **Global Options (BEFORE subcommand):**
 
