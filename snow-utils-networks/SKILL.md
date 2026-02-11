@@ -1,6 +1,6 @@
 ---
 name: snow-utils-networks
-description: "Create Snowflake network rules and policies for IP allowlisting. Use when: setting up network security, creating ingress/egress rules, allowlisting GitHub Actions, Google IPs, or custom CIDRs. Triggers: network rule, network policy, IP allowlist, CIDR, ingress, egress, GitHub Actions IPs, firewall, replay network, replay network manifest, recreate network, replay all manifests, replay all snow-utils, export manifest for sharing, setup from shared manifest, replay from shared manifest."
+description: "Create Snowflake network rules and policies for IP allowlisting. Use when: setting up network security, creating ingress/egress rules, allowlisting GitHub Actions, Google IPs, or custom CIDRs. Triggers: network rule, network policy, IP allowlist, CIDR, ingress, egress, GitHub Actions IPs, firewall, replay network, replay network manifest, recreate network, replay all manifests, replay all snow-utils, export manifest for sharing, setup from shared manifest, replay from shared manifest, setup from manifest URL, replay from URL, use manifest from URL."
 ---
 
 # Snowflake Network Rules & Policies
@@ -815,7 +815,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
 #### Replay Flow (Single Confirmation)
 
-**Trigger phrases:** "replay network", "replay network manifest", "recreate network", "replay from manifest"
+**Trigger phrases:** "replay network", "replay network manifest", "recreate network", "replay from manifest", "setup from manifest URL", "replay from URL", "use manifest from `<url>`"
 
 > **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (in current working directory)
 > **🔴 CRITICAL:** Even in replay flow, user MUST see the full SQL preview before confirmation. NEVER skip dry-run output.
@@ -823,6 +823,39 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 **IMPORTANT:** This is the **snow-utils-networks** skill. Only replay sections marked `<!-- START -- snow-utils-networks -->`. If manifest contains other skills (Volumes, PAT), ignore them - use the appropriate skill for those.
 
 **If user asks to replay/recreate from manifest:**
+
+0. **Remote Manifest URL Detection (if user provides a URL):**
+
+   If the user provides a URL (in their prompt or pasted), detect and normalize it **before** local manifest detection:
+
+   **Supported URL patterns and translation rules:**
+   - **GitHub blob:** `https://github.com/{owner}/{repo}/blob/{branch}/{path}` → replace host with `raw.githubusercontent.com` and remove `/blob/` segment
+   - **GitHub raw:** `https://raw.githubusercontent.com/...` → use as-is
+   - **GitHub gist:** `https://gist.github.com/{user}/{id}` → append `/raw` if not already present
+   - **Any other HTTPS URL ending in `.md`** → use as-is
+
+   **After translating, show user and confirm:**
+
+   ```
+   Found manifest URL. Download URL:
+     <translated_raw_url>
+
+   Download to current directory as <filename>? [yes/no]
+   ```
+
+   **⚠️ STOP**: Wait for user confirmation.
+
+   **If yes:**
+
+   ```bash
+   curl -fSL -o <filename> "<translated_raw_url>"
+   ```
+
+   > **Filename derivation:** Extract the filename from the URL path (e.g., `networks-demo-manifest.md`). If the file already exists locally, ask user: overwrite / rename / cancel.
+
+   **If no:** Stop.
+
+   After successful download, continue with step 1 below — the downloaded file will be picked up by the `*-manifest.md` glob.
 
 1. **Detect manifest(s) in current directory:**
 
@@ -859,10 +892,10 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
    | Choice | Action |
    |--------|--------|
    | **A** | Use working manifest → step 2 |
-   | **B** | Backup working to `.bak`, copy shared to `.snow-utils/snow-utils-manifest.md` → step 1b |
+   | **B** | `mkdir -p .snow-utils && chmod 700 .snow-utils`, backup working to `.bak`, copy shared to `.snow-utils/snow-utils-manifest.md` → step 1b |
    | **C** | Stop. |
 
-   **If ONLY shared manifest:** Copy to `.snow-utils/snow-utils-manifest.md` → step 1b.
+   **If ONLY shared manifest:** `mkdir -p .snow-utils && chmod 700 .snow-utils`, then copy to `.snow-utils/snow-utils-manifest.md` → step 1b.
    **If ONLY working manifest:** Go to step 2.
 
 1b. **Shared manifest adapt-check (ALWAYS run for shared manifests):**

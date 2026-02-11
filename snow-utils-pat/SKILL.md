@@ -1,6 +1,6 @@
 ---
 name: snow-utils-pat
-description: "Create Snowflake Programmatic Access Tokens (PATs) for service accounts. Use when: setting up service user, creating PAT, configuring authentication policy, network policy for PAT. Triggers: programmatic access token, PAT, service account, snowflake authentication, replay pat, replay pat manifest, recreate pat, replay all manifests, replay all snow-utils, export manifest for sharing, setup from shared manifest, replay from shared manifest."
+description: "Create Snowflake Programmatic Access Tokens (PATs) for service accounts. Use when: setting up service user, creating PAT, configuring authentication policy, network policy for PAT. Triggers: programmatic access token, PAT, service account, snowflake authentication, replay pat, replay pat manifest, recreate pat, replay all manifests, replay all snow-utils, export manifest for sharing, setup from shared manifest, replay from shared manifest, setup from manifest URL, replay from URL, use manifest from URL."
 ---
 
 # Snowflake PAT Setup
@@ -986,13 +986,46 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 > Cortex Code constructs summary from manifest, runs `--dry-run` to show full SQL preview, gets ONE confirmation, then executes.
 > **🔴 CRITICAL:** Even in replay flow, user MUST see the full SQL preview before confirmation. NEVER skip dry-run output.
 
-**Trigger phrases:** "replay pat", "replay pat manifest", "recreate pat", "replay from manifest"
+**Trigger phrases:** "replay pat", "replay pat manifest", "recreate pat", "replay from manifest", "setup from manifest URL", "replay from URL", "use manifest from `<url>`"
 
 > **📍 Manifest Location:** `.snow-utils/snow-utils-manifest.md` (in current working directory)
 
 **IMPORTANT:** This is the **snow-utils-pat** skill. Only replay sections marked `<!-- START -- snow-utils-pat -->`. If manifest contains other skills (Volumes, Networks), ignore them - use the appropriate skill for those.
 
 **If user asks to replay/recreate from manifest:**
+
+0. **Remote Manifest URL Detection (if user provides a URL):**
+
+   If the user provides a URL (in their prompt or pasted), detect and normalize it **before** local manifest detection:
+
+   **Supported URL patterns and translation rules:**
+   - **GitHub blob:** `https://github.com/{owner}/{repo}/blob/{branch}/{path}` → replace host with `raw.githubusercontent.com` and remove `/blob/` segment
+   - **GitHub raw:** `https://raw.githubusercontent.com/...` → use as-is
+   - **GitHub gist:** `https://gist.github.com/{user}/{id}` → append `/raw` if not already present
+   - **Any other HTTPS URL ending in `.md`** → use as-is
+
+   **After translating, show user and confirm:**
+
+   ```
+   Found manifest URL. Download URL:
+     <translated_raw_url>
+
+   Download to current directory as <filename>? [yes/no]
+   ```
+
+   **⚠️ STOP**: Wait for user confirmation.
+
+   **If yes:**
+
+   ```bash
+   curl -fSL -o <filename> "<translated_raw_url>"
+   ```
+
+   > **Filename derivation:** Extract the filename from the URL path (e.g., `pat-demo-manifest.md`). If the file already exists locally, ask user: overwrite / rename / cancel.
+
+   **If no:** Stop.
+
+   After successful download, continue with step 1 below — the downloaded file will be picked up by the `*-manifest.md` glob.
 
 1. **Detect manifest(s) in current directory:**
 
@@ -1029,10 +1062,10 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
    | Choice | Action |
    |--------|--------|
    | **A** | Use working manifest → step 2 |
-   | **B** | Backup working to `.bak`, copy shared to `.snow-utils/snow-utils-manifest.md` → step 1b |
+   | **B** | `mkdir -p .snow-utils && chmod 700 .snow-utils`, backup working to `.bak`, copy shared to `.snow-utils/snow-utils-manifest.md` → step 1b |
    | **C** | Stop. |
 
-   **If ONLY shared manifest:** Copy to `.snow-utils/snow-utils-manifest.md` → step 1b.
+   **If ONLY shared manifest:** `mkdir -p .snow-utils && chmod 700 .snow-utils`, then copy to `.snow-utils/snow-utils-manifest.md` → step 1b.
    **If ONLY working manifest:** Go to step 2.
 
 1b. **Shared manifest adapt-check (ALWAYS run for shared manifests):**

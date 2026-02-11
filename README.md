@@ -270,17 +270,56 @@ Options:
 3. Keep original names → proceed
 ```
 
+### Remote Manifest URLs
+
+Skills can also fetch shared manifests directly from URLs. Supported URL formats:
+
+- **GitHub blob:** `https://github.com/{owner}/{repo}/blob/{branch}/{path}` (auto-translated to raw URL)
+- **GitHub raw:** `https://raw.githubusercontent.com/...`
+- **GitHub gist:** `https://gist.github.com/{user}/{id}`
+- **Any HTTPS URL** ending in `.md`
+
+Example:
+
+```
+"replay pat from https://github.com/kameshsampath/snow-utils-skills/blob/main/example-manifests/pat-demo-manifest.md"
+```
+
+Cortex Code will translate the URL to the raw download URL, confirm the download, save the file to the current directory, and then proceed with the normal shared manifest flow (including name adaptation).
+
 ### Trigger Phrases
 
 | Action | Phrases |
 |--------|---------|
 | Export | "export manifest for sharing" |
 | Import/Setup | "setup from shared manifest", "replay from shared manifest", "import shared manifest" |
+| From URL | "setup from manifest URL", "replay from URL", "use manifest from `<url>`" |
+
+## Example Manifests
+
+The [`example-manifests/`](./example-manifests/) directory contains ready-to-use shared manifests for each skill:
+
+| Manifest | Skill | Description |
+|----------|-------|-------------|
+| [pat-demo-manifest.md](./example-manifests/pat-demo-manifest.md) | snow-utils-pat | Standalone PAT setup |
+| [networks-demo-manifest.md](./example-manifests/networks-demo-manifest.md) | snow-utils-networks | Standalone network rules setup |
+| [volumes-demo-manifest.md](./example-manifests/volumes-demo-manifest.md) | snow-utils-volumes | Standalone external volume setup |
+
+> [!TIP]
+> Use these directly from a URL:
+> ```
+> "replay pat from https://github.com/kameshsampath/snow-utils-skills/blob/main/example-manifests/pat-demo-manifest.md"
+> ```
+> Cortex Code will download, adapt names for your account, and replay.
 
 ## Project Structure
 
 ```
 snow-utils-skills/
+├── example-manifests/        # Shared manifest examples
+│   ├── pat-demo-manifest.md
+│   ├── networks-demo-manifest.md
+│   └── volumes-demo-manifest.md
 ├── snow-utils-pat/           # PAT skill
 │   ├── SKILL.md              # Skill workflow (for Cortex Code)
 │   ├── README.md             # User documentation
