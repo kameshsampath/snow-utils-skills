@@ -30,6 +30,7 @@ Creates and manages network rules and policies for IP-based access control in Sn
 - **NEVER run raw SQL for cleanup** - ALWAYS use CLI commands (handles dependency order and detach/reattach)
 - **NEVER offer to drop SNOW_UTILS_DB** - it is shared infrastructure; cleanup only drops resources *inside* it (network rules, schemas), never the database itself
 - **NEVER guess or invent CLI options** - ONLY use options from the CLI Reference tables; if a command fails with "No such option", run `<command> --help` and use ONLY those options
+- **NEVER use sed/awk/bash to edit manifest files** -- use the file editing tool (Edit/StrReplace) to update manifest content. sed commands fail on macOS and with complex markdown.
 - If .env values are empty, prompt user or run `check-setup` CLI
 
 **✅ INTERACTIVE PRINCIPLE:** This skill is designed to be interactive. At every decision point, ASK the user and WAIT for their response before proceeding.
@@ -653,7 +654,7 @@ Cortex Code can use this manifest to replay creation or cleanup resources.
 
 #### Progressive Manifest Writing
 
-**Update manifest AFTER EACH resource is successfully created (not at the end).**
+**Update manifest AFTER EACH resource is successfully created (not at the end).** Use the **file editing tool** (Edit/StrReplace) for all manifest updates.
 
 **After network rule created:**
 
@@ -803,7 +804,7 @@ DROP NETWORK RULE IF EXISTS {NW_RULE_DB}.{NW_RULE_SCHEMA}.{NW_RULE_NAME};
 
 5. **On confirmation:** Execute the CLI command from manifest
 
-6. **After cleanup success, update manifest status to REMOVED:**
+6. **After cleanup success, update manifest status to REMOVED.** Use the **file editing tool** (Edit/StrReplace) to:
 
    Change `**Status:** COMPLETE` to `**Status:** REMOVED` in the section.
 

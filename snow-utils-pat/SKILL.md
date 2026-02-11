@@ -19,6 +19,7 @@ Creates service users, network policies, authentication policies, and Programmat
 - NEVER skip SQL in dry-run output - always show BOTH summary AND full SQL
 - **NEVER display PAT tokens in diffs, logs, or ANY output** - always mask as `***REDACTED***`
 - **NEVER show .env file contents after PAT is written** - use redacted placeholder
+- **NEVER use sed/awk/bash to edit manifest files** -- use the file editing tool (Edit/StrReplace) to update manifest content. sed commands fail on macOS and with complex markdown.
 - **NEVER run raw SQL for cleanup** - ALWAYS use `snow-utils-pat remove` command (handles dependency order automatically)
 - **NEVER create resources without showing SQL and getting confirmation first**
 - **NEVER offer to drop SNOW_UTILS_DB** - it is shared infrastructure; `remove` only drops resources *inside* it (policies, schemas), never the database itself
@@ -785,7 +786,7 @@ Cortex Code uses this manifest to track, audit, and cleanup resources.
 
 #### Progressive Manifest Writing
 
-**Update manifest AFTER EACH resource is successfully created (not at the end).**
+**Update manifest AFTER EACH resource is successfully created (not at the end).** Use the **file editing tool** (Edit/StrReplace) for all manifest updates.
 
 This enables recovery if Cortex Code loses context mid-creation.
 
@@ -955,7 +956,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 
 5. **On confirmation:** Execute the CLI command from manifest
 
-6. **After cleanup success:**
+6. **After cleanup success:** Use the **file editing tool** (Edit/StrReplace) to:
    - Update the manifest section: change `Status: COMPLETE` to `Status: REMOVED`
    - Add removal timestamp: `**Removed:** {TIMESTAMP}`
    - **DO NOT delete the manifest** - preserve for audit/reference
