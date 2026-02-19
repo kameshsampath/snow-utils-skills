@@ -898,7 +898,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 2. Read `project_name` from `## project_recipe`
 3. Ask user for export location (default: project root)
 4. Create `{project_name}-manifest.md` with:
-   - `<!-- COCO_INSTRUCTION -->` at top
+   - `<!-- CORTEX_CODE_INSTRUCTION -->` at top
    - `## shared_info` with origin metadata
    - ALL statuses set to `REMOVED`
    - `# ADAPT: user-prefixed` markers on user-prefixed values
@@ -1039,7 +1039,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
      echo "Working manifest: Status=${WORKING_STATUS}"
 
    for f in *-manifest.md; do
-     [ -f "$f" ] && grep -q "## shared_info\|COCO_INSTRUCTION" "$f" 2>/dev/null && \
+     [ -f "$f" ] && grep -q "## shared_info\|CORTEX_CODE_INSTRUCTION" "$f" 2>/dev/null && \
        SHARED_MANIFEST="EXISTS" && SHARED_MANIFEST_FILE="$f" && echo "Shared manifest: $f"
    done
    ```
@@ -1071,7 +1071,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
 1b. **Shared manifest adapt-check (ALWAYS run for shared manifests):**
 
    ```bash
-   IS_SHARED=$(grep -c "## shared_info\|COCO_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+   IS_SHARED=$(grep -c "## shared_info\|CORTEX_CODE_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
    if [ "$IS_SHARED" -gt 0 ]; then
      ADAPT_COUNT=$(grep -c "# ADAPT:" .snow-utils/snow-utils-manifest.md 2>/dev/null)
      echo "Shared manifest detected. ADAPT markers: ${ADAPT_COUNT}"
@@ -1148,7 +1148,7 @@ DROP NETWORK RULE IF EXISTS {SNOW_UTILS_DB}.NETWORKS.{SA_USER}_NETWORK_RULE;
       Otherwise, detect shared origin and scan for `# ADAPT:` markers:
 
       ```bash
-      IS_SHARED=$(grep -c "## shared_info\|COCO_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
+      IS_SHARED=$(grep -c "## shared_info\|CORTEX_CODE_INSTRUCTION" .snow-utils/snow-utils-manifest.md 2>/dev/null)
       [ "$IS_SHARED" -gt 0 ] && ADAPT_COUNT=$(grep -c "# ADAPT:" .snow-utils/snow-utils-manifest.md 2>/dev/null)
       ```
 

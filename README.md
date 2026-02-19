@@ -163,7 +163,7 @@ sequenceDiagram
     CC->>CC: Copy manifest to pat-demo-manifest.md
     CC->>CC: Set statuses to REMOVED
     CC->>CC: Add ADAPT markers on user-prefixed values
-    CC->>CC: Inject COCO_INSTRUCTION + shared_info + required_skills
+    CC->>CC: Inject CORTEX_CODE_INSTRUCTION + shared_info + required_skills
     CC-->>Alice: Export saved to project root
 
     Alice->>Email: Send pat-demo-manifest.md
@@ -171,7 +171,7 @@ sequenceDiagram
     Email-->>Bob: Receives manifest file
 
     Bob->>CC2: Opens file, asks "setup from shared manifest"
-    CC2->>CC2: Reads COCO_INSTRUCTION, checks required_skills
+    CC2->>CC2: Reads CORTEX_CODE_INSTRUCTION, checks required_skills
     CC2->>Bob: "Install missing skill? (snow-utils-pat)"
     Bob-->>CC2: Yes
     CC2->>CC2: cortex skill add snow-utils-pat
@@ -209,7 +209,7 @@ sequenceDiagram
 ### Example: Exported Manifest (What Bob Receives)
 
 ```markdown
-<!-- COCO_INSTRUCTION: This is a shared snow-utils manifest.
+<!-- CORTEX_CODE_INSTRUCTION: This is a shared snow-utils manifest.
      project_name: pat-demo
      setup_steps:
        1. Check if required skills are installed: cortex skill list

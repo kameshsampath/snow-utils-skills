@@ -1,4 +1,4 @@
-<!-- COCO_INSTRUCTION: This is a shared snow-utils manifest.
+<!-- CORTEX_CODE_INSTRUCTION: This is a shared snow-utils manifest.
      project_name: volumes-demo
      setup_steps:
        1. Check if required skills are installed: cortex skill list
